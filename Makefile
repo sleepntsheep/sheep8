@@ -3,7 +3,7 @@ all:
 	make run
 
 build:
-	g++ main.c -Wall -lSDL2 -o out
+	gcc -std=c11 main.c -Wall -lSDL2 -o out
 
 run:
 	./out

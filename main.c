@@ -33,10 +33,13 @@ int pc = 0x200;
 uint16_t stack[256];
 uint8_t sp;
 
+//keyboard
+bool state[16];
+const uint8_t keymap[1000] = {[49] = 0x1, [50] = 0x2, [51] = 0x3, [52] = 0xC, [81] = 0x4, [87] = 0x5, [69] = 0x6, [82] = 0xD, [65] = 0x7, [83] = 0x8, [68] = 0x9, [70] = 0xE, [90] = 0xA, [88] = 0x11, [67] = 0xB, [86] = 0xF};
+
 //sdl stuff
 
 Uint32 time_step_ms = 1000 / 60;
-Uint32 next_game_step = SDL_GetTicks();
 
 bool running = true;
 SDL_Window* window = NULL;
@@ -44,7 +47,6 @@ SDL_Renderer* renderer;
 SDL_Event event;
 SDL_Surface* surface;
 SDL_Rect rect;
-Uint8* state;
 
 int init();
 
@@ -71,15 +73,26 @@ int main(int argc, char** argv) {
 
 	loadRom(argv[1]);
 
+	Uint32 next_game_step = SDL_GetTicks();
+
 	while (running) {
 		Uint32 now = SDL_GetTicks();
-		// state = SDL_GetKeyboardState(NULL);
 		while (SDL_PollEvent( &event )) {
 			if ( event.type == SDL_QUIT ) {
 				running = false;
 			}
+			else if ( event.type == SDL_KEYDOWN || SDL_KEYUP) {
+				Uint8 sym = event.key.keysym.sym;
+				if ( keymap[sym] != 0 ) {
+					if ( keymap[sym] == 0x11 ) {
+						state[0] ^= 1;
+					}
+					else {
+						state[keymap[sym]] ^= 1;
+					}
+				}
+			}
 		}
-
 
 		// sound();
 		if (next_game_step <= now) {
@@ -92,6 +105,7 @@ int main(int argc, char** argv) {
 					updateTimers();
 			}
 			display();
+			next_game_step += time_step_ms;
 		}
 		else {
 			SDL_Delay(next_game_step - now);
@@ -149,11 +163,17 @@ void clearScr() {
 }
 
 void display() {
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderClear(renderer);
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 	for (int i = 0; i < ROWS; i++) {
 		for (int j = 0; j < COLS; j++) {
 			if (!screen[i][j])
 				continue;
-			rect = { j * SCALE, i * SCALE, SCALE, SCALE };
+			rect.x = j * SCALE;
+			rect.y = i * SCALE;
+			rect.w = SCALE;
+			rect.h = SCALE;
 			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 			SDL_RenderFillRect(renderer, &rect);
 		}
@@ -162,6 +182,7 @@ void display() {
 }
 
 void interpretOP(uint16_t op) {
+	printf("OP: %x\n", op);
 	pc += 2;
 
 	//AxyB
@@ -192,12 +213,12 @@ void interpretOP(uint16_t op) {
 			break;
 		case 0x3000:
 			// SE Vx, byte
-			if ((v[x] == op) & 0x00FF)
+			if (v[x] == (op & 0x00FF))
 				pc += 2;
 			break;
 		case 0x4000:
 			// SNE Vx, byte
-			if ((v[x] != op) & 0x00FF)
+			if (v[x] != (op & 0x00FF))
 				pc += 2;
 			break;
 		case 0x5000:
@@ -291,6 +312,7 @@ void interpretOP(uint16_t op) {
 						pc += 2;
 					break;
 				case 0xA1:
+					printf("\n\n%d\n\n", v[x]);
 					if (!state[v[x]])
 						pc += 2;
 					break;
