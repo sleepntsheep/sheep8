@@ -91,11 +91,11 @@ void drawText(char * text, int x, int y);
 bool loadRom(char* path);
 
 int main(int argc, char** argv) {
-	if (init() != 0) {
+	loadRom(argv[1]);
+
+	if (init(argv[1]) != 0) {
 		exit(-1);
 	}
-
-	loadRom(argv[1]);
 
 	Uint32 next_game_step = SDL_GetTicks();
 
@@ -107,7 +107,6 @@ int main(int argc, char** argv) {
 			}
 			if ( event.type == SDL_KEYDOWN) {
 				Uint8 sym = event.key.keysym.sym;
-				printf("%d\n", sym);
 				if ( keymap[sym] != 0 ) {
 					if ( keymap[sym] == 0x11 ) {
 						state[0] = 1;
@@ -155,7 +154,7 @@ int main(int argc, char** argv) {
 	SDL_Quit();
 }
 
-int init() {
+int init(char title[]) {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		printf("Error initing SDL: %s\n", SDL_GetError());
 		return -1;
@@ -166,7 +165,11 @@ int init() {
 		return -1;
 	}
 
-	window = SDL_CreateWindow("CHIP8 Emu", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH * SCALE + 200, HEIGHT * SCALE + 200, 0);
+
+	char buffer[100];
+	sprintf(buffer, "Chip8 emulator: %s", title);
+
+	window = SDL_CreateWindow(buffer, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH * SCALE + 200, HEIGHT * SCALE + 200, 0);
 
 	if (!window) {
 		printf("failed creating window: %s", SDL_GetError());
