@@ -1,5 +1,7 @@
 #ifdef _WIN32a
 #include "SDL.h"
+#include "SDL_ttf.h"
+#include "SDL_audio.h"
 #else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -22,10 +24,10 @@
 #define MEMORY_SIZE 4096
 #define NUM_REGISTERS 16
 #define FPS 60
-#define speed 10
 #define AMPLITUDE 28000
 #define FREQUENCY 44100
 #define lastOPcount 10
+int SPEED = 5;
 
 // chip8
 
@@ -88,6 +90,13 @@ void drawText(char * text, int x, int y);
 bool loadRom(char* path);
 
 int main(int argc, char** argv) {
+	if (argc == 1) {
+		printf("You must supply rom file path to open");
+	}
+	if (argc > 2) {
+		SPEED = argv[2];
+	}
+
 	loadRom(argv[1]);
 
 	if (init(argv[1]) != 0) {
@@ -130,7 +139,7 @@ int main(int argc, char** argv) {
 
 		// sound();
 		if (next_game_step <= now) {
-			for (int i = 0; i < speed; i++) {
+			for (int i = 0; i < SPEED; i++) {
 				if (!paused) {
 					uint16_t opcode = (memory[pc] << 8 | memory[pc+1]);
 					interpretOP(opcode);
@@ -166,7 +175,7 @@ int init(char title[]) {
 	char buffer[100];
 	sprintf(buffer, "Chip8 emulator: %s", title);
 
-	window = SDL_CreateWindow(buffer, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH * SCALE + 200, HEIGHT * SCALE + 200, 0);
+	window = SDL_CreateWindow(buffer, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH * SCALE + 200, HEIGHT * SCALE, 0);
 
 	if (!window) {
 		printf("failed creating window: %s", SDL_GetError());
