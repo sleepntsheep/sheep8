@@ -13,29 +13,30 @@
 #define COLS 64
 #define ROWS 32
 #define SCALE 15
-#define MEMORY_SIZE 4096;
-#define NUM_REGISTERS 16;
+#define MEMORY_SIZE 4096
+#define NUM_REGISTERS 16
+#define FPS 60
+const int speed = 10;
 
-struct stack {
-	int pt;
-	uint16_t ar[2000];
-}
-
-uint16_t pop (struct stack st);
-
-void push (struct stack *st, uint16_t num);
+uint16_t pop ();
+void push (uint16_t num);
 
 // chip8
 
 bool screen[ROWS][COLS];
 uint8_t memory[MEMORY_SIZE];
-uint8_t v[NUM_REGISTERS]
-int index = 0;
-int pc = 0x200;
+uint8_t v[NUM_REGISTERS];
 uint8_t delayTimer, soundTimer;
-
+bool paused = false;
+int idx = 0;
+int pc = 0x200;
+uint16_t stack[256];
+uint8_t sp;
 
 //sdl stuff
+
+Uint32 time_step_ms = 1000 / 60;
+Uint32 next_game_step = SDL_GetTicks();
 
 bool running = true;
 SDL_Window* window = NULL;
@@ -49,26 +50,52 @@ int init();
 
 void display();
 
-void flipPixel(int x, int y);
+bool flipPixel(int x, int y);
 
 void clearScr();
 
-void interpret(uint16_t op);
+void interpretOP(uint16_t op);
 
-int main(int argc, char* argv[]) {
+void loadSpriteToMem();
+
+void loadProgramToMem(size_t size, uint8_t *arr);
+
+void updateTimers();
+
+bool loadRom(char* path);
+
+int main(int argc, char** argv) {
 	if (init() != 0) {
 		exit(-1);
 	}
 
+	loadRom(argv[1]);
+
 	while (running) {
-		state = SDL_GetKeyboardState(nullptr);
+		Uint32 now = SDL_GetTicks();
+		// state = SDL_GetKeyboardState(NULL);
 		while (SDL_PollEvent( &event )) {
 			if ( event.type == SDL_QUIT ) {
 				running = false;
 			}
 		}
 
-		display();
+
+		// sound();
+		if (next_game_step <= now) {
+			for (int i = 0; i < speed; i++) {
+				if (!paused) {
+					uint16_t opcode = (memory[pc] << 8 | memory[pc+1]);
+					interpretOP(opcode);
+				}
+				if (!paused)
+					updateTimers();
+			}
+			display();
+		}
+		else {
+			SDL_Delay(next_game_step - now);
+		}
 	}
 }
 
@@ -102,19 +129,19 @@ int init() {
 	return 0;
 }
 
-uint16_t pop (struct stack *st) {
-	st->pt--;
-	return st[pt+1];
+uint16_t pop () {
+	return stack[sp--];
 }
 
-void push (struct stack *st, uint16_t num) {
-	st->pt++;
-	st[pt] = num;
+void push (uint16_t num) {
+	stack[++sp] = num;
 }
 
-void flipPixel(int x, int y) {
+bool flipPixel(int x, int y) {
+	if (y < 0 || y >= ROWS) return 0;
+	if (x < 0 || x >= COLS) return 0;
 	screen[y][x] = screen[y][x] ^ 1;
-	// return !screen[y][x];
+	return !screen[y][x];
 }
 
 void clearScr() {
@@ -134,7 +161,7 @@ void display() {
 	SDL_RenderPresent(renderer);
 }
 
-void interpret(uint16_t op) {
+void interpretOP(uint16_t op) {
 	pc += 2;
 
 	//AxyB
@@ -150,7 +177,7 @@ void interpret(uint16_t op) {
 					break;
 				case 0x00EE:
 					//RET
-					pc = pop(&stack);
+					pc = pop();
 					break;
 			}
 			break;
@@ -160,17 +187,17 @@ void interpret(uint16_t op) {
 			break;
 		case 0x2000:
 			// CALL SUBROUTINE
-			push(&stack, pc);
+			push(pc);
 			pc = op & 0xFFF;
 			break;
 		case 0x3000:
 			// SE Vx, byte
-			if (v[x] == op & 0x00FF)
+			if ((v[x] == op) & 0x00FF)
 				pc += 2;
 			break;
 		case 0x4000:
 			// SNE Vx, byte
-			if (v[x] != op & 0x00FF)
+			if ((v[x] != op) & 0x00FF)
 				pc += 2;
 			break;
 		case 0x5000:
@@ -229,16 +256,33 @@ void interpret(uint16_t op) {
 				pc += 2;
 			break;
 		case 0xA000:
-			index = op & 0x0FFF;
+			idx = op & 0x0FFF;
 			break;
 		case 0xB000:
 			pc = v[0] + (op & 0x0FFF);
 			break;
 		case 0xC000:
-			v[x] = (rand() % 256) & kk;
+			v[x] = (rand() % 256) & (op & 0x00FF);
 			break;
 		case 0xD000:
-		// display sprite
+			{
+				// DRW, Vx, Vy, nibble
+				unsigned char width = 8;
+				unsigned char height = op & 0xF; // nibble
+				v[0xF] = 0;
+				for (int row = 0; row < height; row++) {
+					uint8_t sprite = memory[idx + row];
+
+					for (int col = 0; col < width; col++) {
+						if ((sprite & 0x80) > 0) {
+							if (flipPixel(v[x] + col, v[y] + row))  {
+								v[0xF] = 1; // collision
+							}
+						}
+						sprite <<= 1;
+					}
+				}
+			}
 			break;
 		case 0xE000:
 			switch (op & 0x00FF) {
@@ -248,7 +292,7 @@ void interpret(uint16_t op) {
 					break;
 				case 0xA1:
 					if (!state[v[x]])
-						pc ++ 2;
+						pc += 2;
 					break;
 			}
 			break;
@@ -264,26 +308,104 @@ void interpret(uint16_t op) {
 					delayTimer = v[x];
 					break;
 				case 0x1E:
-					index += v[x];
+					idx += v[x];
 					break;
 				case 0x29:
-				//sprite thing
+					idx = v[x] * 5;
 					break;
 				case 0x33:
-					memory[index] = (v[x] / 100) % 10;
-					memory[index+1] = (v[x] / 10) % 10;
-					memory[index+2] = (v[x] % 10);
+					memory[(int)idx] = (v[x] / 100) % 10;
+					memory[(int)idx+1] = (v[x] / 10) % 10;
+					memory[(int)idx+2] = (v[x] % 10);
 					break;
 				case 0x55:
 					for (int i = 0; i <= x; i++) {
-						memory[index+i] = v[i];
+						memory[idx+i] = v[i];
 					}
 					break;
 				case 0x65:
 					for (int i = 0; i <= x; i++) {
-						v[i] = memory[index+i];
+						v[i] = memory[idx+i];
 					}
 					break;
 			}
 	}
+}
+
+void loadSpriteToMem() {
+	const uint8_t sprites[] = {
+        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+	};
+	size_t n = sizeof(sprites)/sizeof(sprites[0]);
+	for (int i = 0; i < n; i++) {
+		memory[i] = sprites[i];
+	}
+}
+
+void loadProgramToMem(size_t size, uint8_t *arr) {
+	for (int i = 0; i < size; i++) {
+		memory[0x200 + i] = arr[i];
+	}
+}
+
+void updateTimers() {
+	if (delayTimer > 0)
+		delayTimer--;
+	if (soundTimer > 0) 
+		soundTimer--;
+}
+
+bool loadRom(char *path) {
+	printf("Loading rom: %s\n", path);
+
+	FILE *rom = fopen(path, "rb");
+	if (rom == NULL) {
+		printf("Failed to open ROM\n");
+		exit(-1);
+	}
+
+	fseek(rom, 0, SEEK_END);
+	size_t rom_size = ftell(rom);
+	rewind(rom);
+
+	uint8_t *rom_buffer = (uint8_t *) malloc(sizeof(uint8_t) * rom_size);
+	if (rom_buffer == NULL) {
+		printf("Failed to allocate memory for ROM\n");
+		return false;
+	}
+
+	size_t result = fread(rom_buffer, sizeof(uint8_t), (size_t) rom_size, rom);
+	if (result != rom_size) {
+		printf("Failed to read ROM\n");
+		return false;
+	}
+
+	if ((MEMORY_SIZE - 0x200) > rom_size) {
+		for (int i = 0; i < rom_size; ++i) {
+			memory[i+0x200] = rom_buffer[i];
+		}
+	}
+	else  {
+		printf("ROM is too large to fit in memory");
+	}
+
+	fclose(rom);
+	free(rom_buffer);
+
+	return true;
 }
