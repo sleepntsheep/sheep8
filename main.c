@@ -17,7 +17,6 @@
 #include <stdlib.h>
 
 #define FONT_PATH "terminus.ttf"
-#define M_PI 3.14
 #define WIDTH 64
 #define HEIGHT 32
 #define SCALE 15
@@ -94,7 +93,7 @@ int main(int argc, char** argv) {
 		printf("You must supply rom file path to open");
 	}
 	if (argc > 2) {
-		SPEED = argv[2];
+		SPEED = strtol(argv[2], NULL, 10);
 	}
 
 	loadRom(argv[1]);
