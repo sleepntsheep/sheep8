@@ -3,5 +3,5 @@
 ### Todo:
 
 [ ] sound
-[ ] fix bugs
+[x] fix bugs 
 [x] keyboard

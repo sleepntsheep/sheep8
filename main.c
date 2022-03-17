@@ -27,9 +27,6 @@
 #define FREQUENCY 44100
 #define lastOPcount 10
 
-uint16_t pop ();
-void push (uint16_t num);
-
 // chip8
 
 bool screen[HEIGHT][WIDTH];
@@ -202,14 +199,6 @@ void sound() {
 
 }
 
-uint16_t pop () {
-	return stack[sp--];
-}
-
-void push (uint16_t num) {
-	stack[++sp] = num;
-}
-
 bool flipPixel(int x, int y) {
 	if (y < 0 || y >= HEIGHT) return 0;
 	if (x < 0 || x >= WIDTH) return 0;
@@ -249,15 +238,20 @@ void display() {
 		drawText( buffer, WIDTH * SCALE + 10, i * 20 + 40 );
 	}
 
-	drawText( "KeyStates", WIDTH * SCALE + 10, 300 );
+	drawText( "KeyStates", WIDTH * SCALE + 10, 250 );
 	sprintf(buffer, "%d %d %d %d", state[1], state[2], state[3], state[0xC]);
-	drawText( buffer, WIDTH * SCALE + 10, 350);
+	drawText( buffer, WIDTH * SCALE + 10, 280);
 	sprintf(buffer, "%d %d %d %d", state[4], state[5], state[6], state[0xD]);
-	drawText( buffer, WIDTH * SCALE + 10, 370);
+	drawText( buffer, WIDTH * SCALE + 10, 300);
 	sprintf(buffer, "%d %d %d %d", state[7], state[8], state[9], state[0xE]);
-	drawText( buffer, WIDTH * SCALE + 10, 390);
+	drawText( buffer, WIDTH * SCALE + 10, 320);
 	sprintf(buffer, "%d %d %d %d", state[0xA], state[0], state[0xB], state[0xF]);
-	drawText( buffer, WIDTH * SCALE + 10, 410);
+	drawText( buffer, WIDTH * SCALE + 10, 340);
+
+	sprintf(buffer, "Index: %x", idx);
+	drawText( buffer, WIDTH * SCALE + 10, 370);
+	sprintf(buffer, "PC: %x", pc);
+	drawText( buffer, WIDTH * SCALE + 10, 390);
 
 	SDL_RenderPresent(renderer);
 }
@@ -293,7 +287,7 @@ void interpretOP(uint16_t op) {
 					break;
 				case 0x00EE:
 					//RET
-					pc = pop();
+					pc = stack[sp--];
 					break;
 			}
 			break;
@@ -306,7 +300,7 @@ void interpretOP(uint16_t op) {
 		case 0x2000:
 		{
 			// CALL SUBROUTINE
-			push(pc);
+			stack[++sp] = pc;
 			pc = op & 0xFFF;
 			break;
 		}
@@ -333,6 +327,9 @@ void interpretOP(uint16_t op) {
 			break;
 		case 0x8000:
 			switch (op & 0xF) {
+				case 0x0:
+					v[x] = v[y];
+					break;
 				case 0x1:
 					v[x] = v[x] | v[y];
 					break;
@@ -343,8 +340,10 @@ void interpretOP(uint16_t op) {
 					v[x] = v[x] ^ v[y];
 					break;
 				case 0x4:
-					if ((int)v[x] + (int)v[y] > 0xFF)
+					if (v[x] + v[y] > 0xFF)
 						v[0xF] = 1;
+					else
+						v[0xF] = 0;
 					v[x] += v[y];
 					break;
 				case 0x5:
@@ -426,6 +425,9 @@ void interpretOP(uint16_t op) {
 					break;
 				case 0x15:
 					delayTimer = v[x];
+					break;
+				case 0x18:
+					soundTimer = v[x];
 					break;
 				case 0x1E:
 					idx += v[x];
