@@ -15,28 +15,19 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdlib.h>
+#include "main.h"
 
-#define FONT_PATH "terminus.ttf"
-#define WIDTH 64
-#define HEIGHT 32
-#define SCALE 15
-#define MEMORY_SIZE 4096
-#define NUM_REGISTERS 16
-#define FPS 60
-#define AMPLITUDE 28000
-#define FREQUENCY 44100
-#define lastOPcount 10
 int SPEED = 5;
 
 // chip8
 
 bool screen[HEIGHT][WIDTH];
-uint8_t memory[MEMORY_SIZE];
-uint8_t v[NUM_REGISTERS];
-uint8_t delayTimer, soundTimer;
 bool paused = false;
 int idx = 0;
 int pc = 0x200;
+uint8_t memory[MEMORY_SIZE];
+uint8_t v[NUM_REGISTERS];
+uint8_t delayTimer, soundTimer;
 uint16_t stack[256];
 uint8_t sp;
 
@@ -62,13 +53,14 @@ SDL_Rect rect;
 SDL_AudioSpec want;
 TTF_Font *font;
 SDL_Color textColor = { 255, 255, 255 };
+SDL_AudioSpec want, have;
+uint64_t samples_played = 0;
+SDL_AudioDeviceID audio_device_id;
 
 // status display
 uint16_t lastop[lastOPcount];
 
 int init();
-
-void sound();
 
 void display();
 
@@ -87,6 +79,8 @@ void updateTimers();
 void drawText(char * text, int x, int y);
 
 bool loadRom(char* path);
+
+void audio_callback(void* userdata, uint8_t* stream, int len);
 
 int main(int argc, char** argv) {
 	if (argc == 1) {
@@ -137,18 +131,17 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		// sound();
 		if (next_game_step <= now) {
 			for (int i = 0; i < SPEED; i++) {
 				if (!paused) {
 					uint16_t opcode = (memory[pc] << 8 | memory[pc+1]);
 					interpretOP(opcode);
 				}
-				if (!paused)
-					updateTimers();
 			}
 			display();
 			next_game_step += time_step_ms;
+			if (!paused)
+				updateTimers();
 		}
 		else {
 			SDL_Delay(next_game_step - now);
@@ -201,11 +194,44 @@ int init(char title[]) {
 		printf("TTF_OpenFont: %s\n", TTF_GetError());
 	}
 
+	SDL_memset(&want, 0, sizeof want);
+
+	want.freq = 44100;
+	want.format = AUDIO_F32;
+	want.channels = 2;
+	want.samples = 512;
+	want.callback = audio_callback;
+	want.userdata = (void*)&samples_played;
+
+	audio_device_id = SDL_OpenAudioDevice(
+		NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+	if (!audio_device_id) {
+		fprintf(stderr, "Error creating SDL audio device. SDL_Error: %s\n", SDL_GetError());
+		SDL_Quit();
+		return -1;
+	}
+
+	SDL_PauseAudioDevice(audio_device_id, 0);
+
 	return 0;
 }
 
-void sound() {
+void audio_callback(void* userdata, uint8_t* stream, int len) {
+	uint64_t* samples_played = (uint64_t*) userdata;
+	float* fstream = (float*)(stream);
 
+	static const float volume = 0.2;
+	static const float frequency = 441.0;
+
+	for (int sid = 0; sid < (len / 8); ++sid) {
+		double time = (*samples_played + sid) / 44100.0;
+		double x = 2.0 * 3.14159 * time * frequency;
+		fstream[2 * sid + 0] = volume * sin(x);
+		fstream[2 * sid + 1] = volume * sin(x);
+	}
+
+	*samples_played += len / 8;
 }
 
 bool flipPixel(int x, int y) {
@@ -257,10 +283,14 @@ void display() {
 	sprintf(buffer, "%d %d %d %d", state[0xA], state[0], state[0xB], state[0xF]);
 	drawText( buffer, WIDTH * SCALE + 10, 340);
 
-	sprintf(buffer, "Index: %x", idx);
-	drawText( buffer, WIDTH * SCALE + 10, 370);
-	sprintf(buffer, "PC: %x", pc);
-	drawText( buffer, WIDTH * SCALE + 10, 390);
+	snprintf( buffer, sizeof(buffer), "Index: %x", idx);
+	drawText( buffer, WIDTH * SCALE + 10, 370 );
+	snprintf( buffer, sizeof(buffer), "PC: %x", pc );
+	drawText( buffer, WIDTH * SCALE + 10, 390 );
+	snprintf( buffer, sizeof(buffer), "Delay timer: %x", delayTimer );
+	drawText( buffer, WIDTH * SCALE + 10, 410 );
+	snprintf( buffer, sizeof(buffer), "Sound timer: %x", soundTimer );
+	drawText( buffer, WIDTH * SCALE + 10, 430 );
 
 	SDL_RenderPresent(renderer);
 }
@@ -504,6 +534,7 @@ void updateTimers() {
 		delayTimer--;
 	if (soundTimer > 0) 
 		soundTimer--;
+	SDL_PauseAudioDevice(audio_device_id, !soundTimer);
 }
 
 bool loadRom(char *path) {

@@ -2,6 +2,7 @@
 
 ### Todo:
 
-[ ] sound
-[x] fix bugs 
-[x] keyboard
+- [ ] refactor
+- [x] sound
+- [x] fix bugs 
+- [x] keyboard
