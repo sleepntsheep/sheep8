@@ -91,6 +91,7 @@ bool loadRom(char* path);
 int main(int argc, char** argv) {
 	if (argc == 1) {
 		printf("You must supply rom file path to open");
+		return 1;
 	}
 	if (argc > 2) {
 		SPEED = strtol(argv[2], NULL, 10);
@@ -99,7 +100,7 @@ int main(int argc, char** argv) {
 	loadRom(argv[1]);
 
 	if (init(argv[1]) != 0) {
-		exit(-1);
+		return 1;
 	}
 
 	Uint32 next_game_step = SDL_GetTicks();
