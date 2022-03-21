@@ -2,29 +2,27 @@
 
 int SPEED = 5;
 
-typedef enum { false, true } bool;
-
 /* chip8 */
 
-bool screen[HEIGHT][WIDTH]; /* chip8 screen, not SDL screen */
-bool paused = false;
+int screen[HEIGHT][WIDTH]; /* chip8 screen, not SDL screen */
+int paused = 0;
 int idx = 0; /* INDEX */
 int pc = 0x200; /* program counter */
-uint8_t memory[MEMORY_SIZE]; /* memory for loading the ROM */
-uint8_t v[NUM_REGISTERS]; /* 8 bit register */
-uint8_t delayTimer, soundTimer;
+uint8_t memory[MEMORY_SIZE]; /* memory for loading the ROM - 2kb */
+uint8_t v[NUM_REGISTERS]; /* 16 8 bit register */
+uint8_t delayTimer, soundTimer; /* sound timer make sound if more than 0 */
 uint16_t stack[256]; /* array for stack */
 uint8_t sp; /* stack pointer */
 
 /* keyboard state */
 
-bool state[16];
+int state[16];
 
 /* SDL stuff */
 
-Uint32 time_step_ms = 1000 / 60;
+Uint32 time_step_ms = 1000 / 60; /* fps */
 
-bool running = true;
+int running = 1;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer;
 SDL_Event event;
@@ -40,30 +38,6 @@ SDL_AudioDeviceID audio_device_id;
 
 /* array of last op osd */
 uint16_t lastop[lastOPcount];
-
-int init(char* title);
-
-void display();
-
-bool flipPixel(int x, int y);
-
-void clearScr();
-
-void interpretOP(uint16_t op);
-
-void loadSpriteToMem();
-
-void loadProgramToMem(size_t size, uint8_t *arr);
-
-void updateTimers();
-
-void drawText(char * text, int x, int y);
-
-bool loadRom(char* path);
-
-void audio_callback(void* userdata, uint8_t* stream, int len);
-
-void handleEvent();
 
 int main(int argc, char** argv) {
 	if (argc == 1) {
@@ -194,7 +168,7 @@ void audio_callback(void* userdata, uint8_t* stream, int len) {
 	*samples_played += len / 8;
 }
 
-bool flipPixel(int x, int y) {
+int flipPixel(int x, int y) {
 	if (y < 0 || y >= HEIGHT) return 0;
 	if (x < 0 || x >= WIDTH) return 0;
 	screen[y][x] = screen[y][x] ^ 1;
@@ -202,7 +176,7 @@ bool flipPixel(int x, int y) {
 }
 
 void clearScr() {
-	memset(screen, false, sizeof(bool) * WIDTH * HEIGHT);
+	memset(screen, 0, sizeof(int) * WIDTH * HEIGHT);
 }
 
 void display() {
@@ -259,12 +233,12 @@ void display() {
 void handleEvent() {
     switch ( event.type ) {
         case SDL_QUIT:
-            running = false;
+            running = 0;
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP: {
             Uint8 sym = event.key.keysym.sym;
-            bool keydown = (event.type == SDL_KEYDOWN);
+            int keydown = (event.type == SDL_KEYDOWN);
             switch (sym) {
             	case SDLK_1:
             		state[0x1] = keydown;
@@ -575,7 +549,7 @@ void updateTimers() {
 	SDL_PauseAudioDevice(audio_device_id, !soundTimer);
 }
 
-bool loadRom(char *path) {
+int loadRom(char *path) {
 	printf("Loading rom: %s\n", path);
 
 	FILE *rom = fopen(path, "rb");
@@ -614,5 +588,5 @@ bool loadRom(char *path) {
 	fclose(rom);
 	free(rom_buffer);
 
-	return true;
+	return 1;
 }

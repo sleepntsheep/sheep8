@@ -28,5 +28,29 @@
 #define FREQUENCY 44100
 #define lastOPcount 10
 
+int init(char* title);
+
+void display();
+
+int flipPixel(int x, int y);
+
+void clearScr();
+
+void interpretOP(uint16_t op);
+
+void loadSpriteToMem();
+
+void loadProgramToMem(size_t size, uint8_t *arr);
+
+void updateTimers();
+
+void drawText(char * text, int x, int y);
+
+int loadRom(char* path);
+
+void audio_callback(void* userdata, uint8_t* stream, int len);
+
+void handleEvent();
+
 
 #endif
