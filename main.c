@@ -1,23 +1,8 @@
-#ifdef _WIN32a
-#include "SDL.h"
-#include "SDL_ttf.h"
-#include "SDL_audio.h"
-#else
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
-#include <SDL2/SDL_audio.h>
-#endif
-
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "main.h"
 
 int SPEED = 5;
+
+typedef enum { false, true } bool;
 
 /* chip8 */
 
@@ -56,7 +41,7 @@ SDL_AudioDeviceID audio_device_id;
 /* array of last op osd */
 uint16_t lastop[lastOPcount];
 
-int init();
+int init(char* title);
 
 void display();
 
@@ -128,7 +113,7 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-int init(char title[]) {
+int init(char* title) {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		fprintf(stderr, "Error initing SDL: %s\n", SDL_GetError());
 		return -1;
@@ -244,7 +229,7 @@ void display() {
 
 	/* display 5 last op code */
 	char buffer[16];
-	drawText( "Operations", WIDTH * SCALE + 10, 10 );
+	drawText( "Operations", WIDTH * SCALE + 10, 10 )	;
 	for (i = 0; i < lastOPcount; i++) {
 		sprintf(buffer, "%x", lastop[i]);
 		drawText( buffer, WIDTH * SCALE + 10, i * 20 + 40 );
