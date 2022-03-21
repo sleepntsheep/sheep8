@@ -6,15 +6,15 @@ typedef enum { false, true } bool;
 
 /* chip8 */
 
-bool screen[HEIGHT][WIDTH];
+bool screen[HEIGHT][WIDTH]; /* chip8 screen, not SDL screen */
 bool paused = false;
-int idx = 0;
-int pc = 0x200;
-uint8_t memory[MEMORY_SIZE];
-uint8_t v[NUM_REGISTERS];
+int idx = 0; /* INDEX */
+int pc = 0x200; /* program counter */
+uint8_t memory[MEMORY_SIZE]; /* memory for loading the ROM */
+uint8_t v[NUM_REGISTERS]; /* 8 bit register */
 uint8_t delayTimer, soundTimer;
-uint16_t stack[256];
-uint8_t sp;
+uint16_t stack[256]; /* array for stack */
+uint8_t sp; /* stack pointer */
 
 /* keyboard state */
 
@@ -68,7 +68,7 @@ void handleEvent();
 int main(int argc, char** argv) {
 	if (argc == 1) {
 		printf("You must supply rom file path to open");
-		return 1;
+		return -1;
 	}
 	if (argc > 2) {
 		SPEED = strtol(argv[2], NULL, 10);
@@ -76,9 +76,8 @@ int main(int argc, char** argv) {
 
 	loadRom(argv[1]);
 
-	if (init(argv[1]) != 0) {
-		return 1;
-	}
+	if (init(argv[1]) != 0)
+		return -1;
 
 	Uint32 next_game_step = SDL_GetTicks();
 
