@@ -7,19 +7,19 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_audio.h>
 #endif
-// #include <time.h>
-#include <stdio.h>
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "main.h"
 
 int SPEED = 5;
 
-// chip8
+/* chip8 */
 
 bool screen[HEIGHT][WIDTH];
 bool paused = false;
@@ -31,15 +31,11 @@ uint8_t delayTimer, soundTimer;
 uint16_t stack[256];
 uint8_t sp;
 
-//keyboard
-bool state[16];
-const uint8_t keymap[1000] = {
-	[SDLK_1] = 0x1, [SDLK_2] = 0x2, [SDLK_3] = 0x3, [SDLK_4] = 0xC,
-	[SDLK_q] = 0x4, [SDLK_w] = 0x5, [SDLK_e] = 0x6, [SDLK_r] = 0xD,
-	[SDLK_a] = 0x7, [SDLK_s] = 0x8, [SDLK_d] = 0x9, [SDLK_f] = 0xE,
-	[SDLK_z] = 0xA, [SDLK_x] = 0x11, [SDLK_c] = 0xB, [SDLK_v] = 0xF};
+/* keyboard state */
 
-//sdl stuff
+bool state[16];
+
+/* SDL stuff */
 
 Uint32 time_step_ms = 1000 / 60;
 
@@ -50,14 +46,14 @@ SDL_Event event;
 SDL_Surface* surface;
 SDL_Texture *texture;
 SDL_Rect rect;
-SDL_AudioSpec want;
 TTF_Font *font;
 SDL_Color textColor = { 255, 255, 255 };
+
 SDL_AudioSpec want, have;
 uint64_t samples_played = 0;
 SDL_AudioDeviceID audio_device_id;
 
-// status display
+/* array of last op osd */
 uint16_t lastop[lastOPcount];
 
 int init();
@@ -82,6 +78,8 @@ bool loadRom(char* path);
 
 void audio_callback(void* userdata, uint8_t* stream, int len);
 
+void handleEvent();
+
 int main(int argc, char** argv) {
 	if (argc == 1) {
 		printf("You must supply rom file path to open");
@@ -102,37 +100,12 @@ int main(int argc, char** argv) {
 	while (running) {
 		Uint32 now = SDL_GetTicks();
 		while (SDL_PollEvent( &event )) {
-			if ( event.type == SDL_QUIT ) {
-				running = false;
-			}
-			if ( event.type == SDL_KEYDOWN) {
-				Uint8 sym = event.key.keysym.sym;
-				if ( keymap[sym] != 0 ) {
-					if ( keymap[sym] == 0x11 ) {
-						state[0] = 1;
-					}
-					else {
-						state[keymap[sym]] = 1;
-					}
-				}
-				if ( sym == SDLK_SPACE )
-					paused ^= 1;
-			}
-			else if (event.type == SDL_KEYUP) {
-				Uint8 sym = event.key.keysym.sym;
-				if ( keymap[sym] != 0 ) {
-					if ( keymap[sym] == 0x11 ) {
-						state[0] = 0;
-					}
-					else {
-						state[keymap[sym]] = 0;
-					}
-				}
-			}
+            handleEvent();
 		}
 
 		if (next_game_step <= now) {
-			for (int i = 0; i < SPEED; i++) {
+			int i;
+			for (i = 0; i < SPEED; i++) {
 				if (!paused) {
 					uint16_t opcode = (memory[pc] << 8 | memory[pc+1]);
 					interpretOP(opcode);
@@ -151,16 +124,18 @@ int main(int argc, char** argv) {
 	TTF_Quit();
 	SDL_CloseAudio();
 	SDL_Quit();
+
+	return 0;
 }
 
 int init(char title[]) {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-		printf("Error initing SDL: %s\n", SDL_GetError());
+		fprintf(stderr, "Error initing SDL: %s\n", SDL_GetError());
 		return -1;
 	}
 
 	if (!TTF_WasInit() && TTF_Init() == -1) {
-		printf("TTF_Init: %s\n", TTF_GetError());
+		fprintf(stderr, "TTF_Init: %s\n", TTF_GetError());
 		return -1;
 	}
 
@@ -171,21 +146,21 @@ int init(char title[]) {
 	window = SDL_CreateWindow(buffer, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH * SCALE + 200, HEIGHT * SCALE, 0);
 
 	if (!window) {
-		printf("failed creating window: %s", SDL_GetError());
+		fprintf(stderr, "failed creating window: %s", SDL_GetError());
 		return -1;
 	}
 
 	surface = SDL_GetWindowSurface(window);
 
 	if (!surface) {
-		printf("failed creating surface: %s", SDL_GetError());
+		fprintf(stderr, "failed creating surface: %s", SDL_GetError());
 		return -1;
 	}
 
 	renderer = SDL_CreateRenderer(window, -1, 0);
 
 	if (!renderer) {
-		printf("failed creating renderer: %s", SDL_GetError());
+		fprintf(stderr, "failed creating renderer: %s", SDL_GetError());
 		return -1;
 	}
 
@@ -224,7 +199,8 @@ void audio_callback(void* userdata, uint8_t* stream, int len) {
 	static const float volume = 0.2;
 	static const float frequency = 441.0;
 
-	for (int sid = 0; sid < (len / 8); ++sid) {
+	int sid;
+	for (sid = 0; sid < (len / 8); ++sid) {
 		double time = (*samples_played + sid) / 44100.0;
 		double x = 2.0 * 3.14159 * time * frequency;
 		fstream[2 * sid + 0] = volume * sin(x);
@@ -249,8 +225,9 @@ void display() {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-	for (int i = 0; i < HEIGHT; i++) {
-		for (int j = 0; j < WIDTH; j++) {
+	int i, j;
+	for (i = 0; i < HEIGHT; i++) {
+		for (j = 0; j < WIDTH; j++) {
 			if (!screen[i][j])
 				continue;
 			rect.x = j * SCALE;
@@ -265,34 +242,103 @@ void display() {
 	SDL_RenderDrawLine(renderer, 0, HEIGHT * SCALE, WIDTH * SCALE, HEIGHT * SCALE);
 	SDL_RenderDrawLine(renderer, WIDTH * SCALE, 0, WIDTH * SCALE, HEIGHT * SCALE);
 
-	//status
+	/* display 5 last op code */
 	char buffer[16];
 	drawText( "Operations", WIDTH * SCALE + 10, 10 );
-	for (int i = 0; i < lastOPcount; i++) {
+	for (i = 0; i < lastOPcount; i++) {
 		sprintf(buffer, "%x", lastop[i]);
 		drawText( buffer, WIDTH * SCALE + 10, i * 20 + 40 );
 	}
 
 	drawText( "KeyStates", WIDTH * SCALE + 10, 250 );
-	sprintf(buffer, "%d %d %d %d", state[1], state[2], state[3], state[0xC]);
+	sprintf( buffer, "%d %d %d %d", state[1], state[2], state[3], state[0xC]);
 	drawText( buffer, WIDTH * SCALE + 10, 280);
-	sprintf(buffer, "%d %d %d %d", state[4], state[5], state[6], state[0xD]);
+	sprintf( buffer, "%d %d %d %d", state[4], state[5], state[6], state[0xD]);
 	drawText( buffer, WIDTH * SCALE + 10, 300);
-	sprintf(buffer, "%d %d %d %d", state[7], state[8], state[9], state[0xE]);
+	sprintf( buffer, "%d %d %d %d", state[7], state[8], state[9], state[0xE]);
 	drawText( buffer, WIDTH * SCALE + 10, 320);
-	sprintf(buffer, "%d %d %d %d", state[0xA], state[0], state[0xB], state[0xF]);
+	sprintf( buffer, "%d %d %d %d", state[0xA], state[0], state[0xB], state[0xF]);
 	drawText( buffer, WIDTH * SCALE + 10, 340);
 
-	snprintf( buffer, sizeof(buffer), "Index: %x", idx);
+	sprintf( buffer, "Index: %x", idx);
 	drawText( buffer, WIDTH * SCALE + 10, 370 );
-	snprintf( buffer, sizeof(buffer), "PC: %x", pc );
+	sprintf( buffer, "PC: %x", pc );
 	drawText( buffer, WIDTH * SCALE + 10, 390 );
-	snprintf( buffer, sizeof(buffer), "Delay timer: %x", delayTimer );
+	sprintf( buffer, "Delay timer: %x", delayTimer );
 	drawText( buffer, WIDTH * SCALE + 10, 410 );
-	snprintf( buffer, sizeof(buffer), "Sound timer: %x", soundTimer );
+	sprintf( buffer, "Sound timer: %x", soundTimer );
 	drawText( buffer, WIDTH * SCALE + 10, 430 );
 
 	SDL_RenderPresent(renderer);
+}
+
+void handleEvent() {
+    switch ( event.type ) {
+        case SDL_QUIT:
+            running = false;
+            break;
+        case SDL_KEYDOWN:
+        case SDL_KEYUP: {
+            Uint8 sym = event.key.keysym.sym;
+            bool keydown = (event.type == SDL_KEYDOWN);
+            switch (sym) {
+            	case SDLK_1:
+            		state[0x1] = keydown;
+            		break;
+            	case SDLK_2:
+            		state[0x2] = keydown;
+            		break;
+            	case SDLK_3:
+            		state[0x3] = keydown;
+            		break;
+            	case SDLK_4:
+            		state[0xC] = keydown;
+            		break;
+            	case SDLK_q:
+            		state[0x4] = keydown;
+            		break;
+            	case SDLK_w:
+            		state[0x5] = keydown;
+            		break;
+            	case SDLK_e:
+            		state[0x6] = keydown;
+            		break;
+        		case SDLK_r:
+        			state[0xD] = keydown;
+        			break;
+        		case SDLK_a:
+        			state[0x7] = keydown;
+        			break;
+        		case SDLK_s:
+        			state[0x8] = keydown;
+        			break;
+        		case SDLK_d:
+        			state[0x9] = keydown;
+        			break;
+        		case SDLK_f:
+        			state[0xE] = keydown;
+        			break;
+        		case SDLK_z:
+        			state[0xA] = keydown;
+        			break;
+        		case SDLK_x:
+        			state[0x0] = keydown;
+        			break;
+        		case SDLK_c:
+        			state[0xB] = keydown;
+        			break;
+        		case SDLK_v:
+        			state[0xF] = keydown;
+        			break;
+            }
+            if (event.type == SDL_KEYDOWN) {
+                if ( sym == SDLK_SPACE ) {
+                    paused ^= 1;
+                }
+            }
+            break;
+        }
+    }
 }
 
 void drawText(char * text, int x, int y) {
@@ -310,10 +356,9 @@ void drawText(char * text, int x, int y) {
 }
 
 void interpretOP(uint16_t op) {
-	// printf("OP: %x\n", op);
 	pc += 2;
 
-	//AxyB
+	/* OP -> AxyB */
 	unsigned char x = (op & 0x0F00) >> 8;
 	unsigned char y = (op & 0x00F0) >> 4;
 
@@ -321,40 +366,40 @@ void interpretOP(uint16_t op) {
 		case 0x0000:
 			switch (op) {
 				case 0x00E0:
-					//CLR
+					/* CLR */
 					clearScr();
 					break;
 				case 0x00EE:
-					//RET
+					/* RET */
 					pc = stack[sp--];
 					break;
 			}
 			break;
 		case 0x1000:
 		{
-			// JUMP TO nnn
+			/* JUMP TO nnn */
 			pc = op & 0xFFF;
 			break;
 		}
 		case 0x2000:
 		{
-			// CALL SUBROUTINE
+			/* call subroutine at nnn */
 			stack[++sp] = pc;
 			pc = op & 0xFFF;
 			break;
 		}
 		case 0x3000:
-			// SE Vx, byte
+			/* SE Vx, byte */
 			if (v[x] == (op & 0x00FF))
 				pc += 2;
 			break;
 		case 0x4000:
-			// SNE Vx, byte
+			/* SNE Vx, byte */
 			if (v[x] != (op & 0x00FF))
 				pc += 2;
 			break;
 		case 0x5000:
-			// SE Vx, Vy
+			/* SE Vx, Vy */
 			if (v[x] == v[y])
 				pc += 2;
 			break;
@@ -424,17 +469,19 @@ void interpretOP(uint16_t op) {
 			break;
 		case 0xD000:
 			{
-				// DRW, Vx, Vy, nibble
+				/* DRW, Vx, Vy, nibble */
 				unsigned char width = 8;
-				unsigned char height = op & 0xF; // nibble
+				unsigned char height = op & 0xF;
 				v[0xF] = 0;
-				for (int row = 0; row < height; row++) {
+				int row, col;
+				for (row = 0; row < height; row++) {
 					uint8_t sprite = memory[idx + row];
 
-					for (int col = 0; col < width; col++) {
+					for (col = 0; col < width; col++) {
 						if ((sprite & 0x80) > 0) {
 							if (flipPixel(v[x] + col, v[y] + row))  {
-								v[0xF] = 1; // collision
+								v[0xF] = 1;
+								/* if register 0xF is set to 1, collision happened */
 							}
 						}
 						sprite <<= 1;
@@ -461,6 +508,7 @@ void interpretOP(uint16_t op) {
 					break;
 				case 0x0A:
 					v[x] = SDL_WaitEvent(&event);
+                    handleEvent();
 					break;
 				case 0x15:
 					delayTimer = v[x];
@@ -479,20 +527,25 @@ void interpretOP(uint16_t op) {
 					memory[(int)idx+1] = (v[x] / 10) % 10;
 					memory[(int)idx+2] = (v[x] % 10);
 					break;
-				case 0x55:
-					for (int i = 0; i <= x; i++) {
+				case 0x55: {
+					int i;
+					for (i = 0; i <= x; i++) {
 						memory[idx+i] = v[i];
 					}
 					break;
-				case 0x65:
-					for (int i = 0; i <= x; i++) {
+				}
+				case 0x65: {
+					int i;
+					for (i = 0; i <= x; i++) {
 						v[i] = memory[idx+i];
 					}
 					break;
+				}
 			}
 	}
 
-	for (int i = lastOPcount - 2; i >= 0; i--) {
+	int i;
+	for (i = lastOPcount - 2; i >= 0; i--) {
 		lastop[i] = lastop[i+1];
 	}
 	lastop[lastOPcount - 1] = op;
@@ -500,33 +553,34 @@ void interpretOP(uint16_t op) {
 
 void loadSpriteToMem() {
 	const uint8_t sprites[] = {
-        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-        0x20, 0x60, 0x20, 0x20, 0x70, // 1
-        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+        0xF0, 0x90, 0x90, 0x90, 0xF0,
+        0x20, 0x60, 0x20, 0x20, 0x70,
+        0xF0, 0x10, 0xF0, 0x80, 0xF0,
+        0xF0, 0x10, 0xF0, 0x10, 0xF0,
+        0x90, 0x90, 0xF0, 0x10, 0x10,
+        0xF0, 0x80, 0xF0, 0x10, 0xF0,
+        0xF0, 0x80, 0xF0, 0x90, 0xF0,
+        0xF0, 0x10, 0x20, 0x40, 0x40,
+        0xF0, 0x90, 0xF0, 0x90, 0xF0,
+        0xF0, 0x90, 0xF0, 0x10, 0xF0,
+        0xF0, 0x90, 0xF0, 0x90, 0x90,
+        0xE0, 0x90, 0xE0, 0x90, 0xE0,
+        0xF0, 0x80, 0x80, 0x80, 0xF0,
+        0xE0, 0x90, 0x90, 0x90, 0xE0,
+        0xF0, 0x80, 0xF0, 0x80, 0xF0,
+        0xF0, 0x80, 0xF0, 0x80, 0x80 
 	};
+	/* font for 0-F */
 	size_t n = sizeof(sprites)/sizeof(sprites[0]);
-	for (int i = 0; i < n; i++) {
+	int i;
+	for (i = 0; i < n; i++)
 		memory[i] = sprites[i];
-	}
 }
 
 void loadProgramToMem(size_t size, uint8_t *arr) {
-	for (int i = 0; i < size; i++) {
+	int i;
+	for (i = 0; i < size; i++)
 		memory[0x200 + i] = arr[i];
-	}
 }
 
 void updateTimers() {
@@ -542,8 +596,8 @@ bool loadRom(char *path) {
 
 	FILE *rom = fopen(path, "rb");
 	if (rom == NULL) {
-		printf("Failed to open ROM\n");
-		exit(-1);
+		fprintf(stderr, "Failed to open ROM\n");
+		return -1;
 	}
 
 	fseek(rom, 0, SEEK_END);
@@ -552,23 +606,25 @@ bool loadRom(char *path) {
 
 	uint8_t *rom_buffer = (uint8_t *) malloc(sizeof(uint8_t) * rom_size);
 	if (rom_buffer == NULL) {
-		printf("Failed to allocate memory for ROM\n");
-		return false;
+		fprintf(stderr, "Failed to allocate memory for ROM\n");
+		return -1;
 	}
 
 	size_t result = fread(rom_buffer, sizeof(uint8_t), (size_t) rom_size, rom);
 	if (result != rom_size) {
-		printf("Failed to read ROM\n");
-		return false;
+		fprintf(stderr, "Failed to read ROM\n");
+		return -1;
 	}
 
 	if ((MEMORY_SIZE - 0x200) > rom_size) {
-		for (int i = 0; i < rom_size; ++i) {
+		int i;
+		for (i = 0; i < rom_size; ++i) {
 			memory[i+0x200] = rom_buffer[i];
 		}
 	}
 	else  {
-		printf("ROM is too large to fit in memory");
+		fprintf(stderr, "Rom too large to fit in memory\n");
+		return -1;
 	}
 
 	fclose(rom);
