@@ -7,50 +7,47 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifdef _WIN32a
-#include "SDL.h"
-#include "SDL_ttf.h"
-#include "SDL_audio.h"
-#else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_audio.h>
-#endif
 
-#define FONT_PATH "terminus.ttf"
-#define WIDTH 64
-#define HEIGHT 32
+#include "chip8.h"
+
+#define FONT_PATH "assets/terminus.ttf"
 #define SCALE 15
-#define MEMORY_SIZE 4096
-#define NUM_REGISTERS 16
 #define FPS 60
 #define AMPLITUDE 28000
 #define FREQUENCY 44100
 #define lastOPcount 10
+#define SWIDTH WIDTH * SCALE
+#define SHEIGHT HEIGHT * SCALE
+#define SAVEFILE "save"
 
-int init(char* title);
+int
+init(char* title);
 
-void display();
+void
+die(const char *s);
 
-int flipPixel(int x, int y);
+void
+display(Chip8 *chip);
 
-void clearScr();
+void
+updatetimer(Chip8 *chip);
 
-void interpretOP(uint16_t op);
+void
+quit(void);
 
-void loadSpriteToMem();
+void
+audio_callback(void* userdata, uint8_t* stream, int len);
 
-void loadProgramToMem(size_t size, uint8_t *arr);
+void
+handle_event(Chip8 *chip, SDL_Event event);
 
-void updateTimers();
+void
+save_state(Chip8 *chip);
 
-void drawText(char * text, int x, int y);
-
-int loadRom(char* path);
-
-void audio_callback(void* userdata, uint8_t* stream, int len);
-
-void handleEvent();
-
+void
+load_save(Chip8 *chip);
 
 #endif
