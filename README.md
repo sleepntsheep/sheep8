@@ -13,7 +13,10 @@ http://nicktasios.nl/posts/making-sounds-using-sdl-and-visualizing-them-on-a-sim
 
 ### Todo:
 
-- [ ] refactor
+- [x] refactor
+- [ ] text entry widget for changing values intuitivly
+- [ ] better way for user to specify roms filepath than argv[1]
 - [x] sound
 - [x] fix bugs 
 - [x] keyboard
+- [x] buttons
