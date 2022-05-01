@@ -20,20 +20,26 @@ btn_isover(Button *btn, int x, int y) {
 
 void
 btn_draw(SDL_Renderer *renderer, Button *btn, TTF_Font *font) {
+    SDL_Rect rect;
+    rect.x = btn->x; rect.y = btn->y; rect.w = btn->w; rect.h = btn->h;
+    
 	SDL_SetRenderDrawColor(renderer, btn->r, btn->g, btn->b, 0);
-    SDL_Rect rect = { btn->x, btn->y, btn->w, btn->h };
     SDL_RenderFillRect(renderer, &rect);
     draw_text(renderer, btn->text, btn->x+btn->w/2, btn->y+btn->h/2, 1, font);
 }
 
 void
 draw_text(SDL_Renderer *renderer, char *text, int x, int y, int center, TTF_Font *font) {
+	SDL_Rect dstrect;
+	int textW, textH;
+
     SDL_Color color = {255,255,255};
 	SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-	int textW, textH;
 	SDL_QueryTexture(texture, NULL,  NULL, &textW, &textH);
-	SDL_Rect dstrect = { x, y, textW, textH };
+
+    dstrect.x = x; dstrect.y = y; dstrect.w = textW; dstrect.h = textH;
+
     if (center) {
         dstrect.x -= textW / 2;
         dstrect.y -= textH / 2;

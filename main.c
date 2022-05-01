@@ -33,7 +33,8 @@ togglepause(void) {
 int
 main(int argc, char** argv) {
     Chip8 *chip = chip_init();
-	Uint32 next_game_step = SDL_GetTicks();
+	uint64_t next_game_step = SDL_GetTicks();
+    SDL_Event event;
 
 	if (argc == 1) {
         die("Supply rom path to open in arg");
@@ -50,9 +51,8 @@ main(int argc, char** argv) {
     loadbtn = btn_init(230, SHEIGHT+10, 100, 40, 100, 100, 100, "Load", load_save);
     quitbtn = btn_init(340, SHEIGHT+10, 100, 40, 100, 100, 100, "Exit", quit);
 
-    SDL_Event event;
 	while (running) {
-		Uint32 now = SDL_GetTicks();
+        uint64_t now = SDL_GetTicks();
 		while (SDL_PollEvent( &event ))
             handle_event(chip, event);
 
@@ -102,22 +102,24 @@ die(const char *s) {
 
 int
 init(char* title) {
+	char buffer[300];
+    int window_flags = 0, renderer_flags = 0;
+
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         die(SDL_GetError());
 
 	if (!TTF_WasInit() && TTF_Init() == -1)
         die(TTF_GetError());
 
-	char buffer[300];
 	sprintf(buffer, "Chip8 emulator: %s", title);
 
-    int window_flags = SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS;
+    window_flags = SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS;
 	window = SDL_CreateWindow(buffer, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SWIDTH + 200, SHEIGHT + 100, window_flags);
 
 	if (!window)
         die(SDL_GetError());
 
-	renderer = SDL_CreateRenderer(window, -1, 0);
+	renderer = SDL_CreateRenderer(window, -1, renderer_flags);
 
 	if (!renderer)
         die(SDL_GetError());
@@ -167,14 +169,16 @@ audio_callback(void* userdata, uint8_t* stream, int len) {
 
 void
 display(Chip8 *chip) {
+	char buffer[16]; /* for osd */
+
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_Rect rect;
-	int i, j;
+    {int i, j;
 	for (i = 0; i < HEIGHT; i++) {
 		for (j = 0; j < WIDTH; j++) {
 			if (chip->screen[i][j]) {
+                SDL_Rect rect;
                 rect.x = j * SCALE;
                 rect.y = i * SCALE;
                 rect.w = SCALE;
@@ -183,18 +187,18 @@ display(Chip8 *chip) {
                 SDL_RenderFillRect(renderer, &rect);
             }
 		}
-	}
+	}}
 	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 	SDL_RenderDrawLine(renderer, 0, SHEIGHT, SWIDTH, SHEIGHT);
 	SDL_RenderDrawLine(renderer, SWIDTH, 0, SWIDTH, SHEIGHT);
 
 	/* display n last op code */
-	char buffer[16];
 	draw_text(renderer, "Operations", SWIDTH + 10, 10, 0, font);
-	for (i = 0; i < lastOPcount; i++) {
+    {int i;
+    for (i = 0; i < lastOPcount; i++) {
 		sprintf(buffer, "%x", lastop[i]);
 		draw_text(renderer, buffer, SWIDTH + 10, i * 20 + 40 , 0, font);
-	}
+	}}
     
     /* osd keystate */
 	draw_text(renderer, "KeyStates", SWIDTH + 10, 250, 0, font);

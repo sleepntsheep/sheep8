@@ -32,11 +32,11 @@ flippixel(Chip8 *chip, int x, int y) {
 
 void
 interpretOP(Chip8 *chip, uint16_t op) {
-	chip->pc += 2;
-
 	/* OP -> AxyB */
 	unsigned char x = (op & 0x0F00) >> 8;
 	unsigned char y = (op & 0x00F0) >> 4;
+
+	chip->pc += 2;
 
 	switch (op & 0xF000) {
 		case 0x0000:
@@ -148,8 +148,8 @@ interpretOP(Chip8 *chip, uint16_t op) {
 				/* DRW, Vx, Vy, nibble */
 				unsigned char width = 8;
 				unsigned char height = op & 0xF;
-				chip->v[0xF] = 0;
 				int row, col;
+				chip->v[0xF] = 0;
 				for (row = 0; row < height; row++) {
 					uint8_t sprite = chip->memory[chip->idx + row];
 
@@ -233,19 +233,24 @@ loadfont(Chip8 *chip) {
 
 int
 loadrom(Chip8 *chip, char *path) {
-	FILE *rom = fopen(path, "rb");
+	FILE *rom = NULL;
+    size_t rom_size;
+    uint8_t *rom_buffer;
+    size_t result;
+
+    rom = fopen(path, "rb");
 	if (rom == NULL)
         die("Failed to open roms");
 
 	fseek(rom, 0, SEEK_END);
-	size_t rom_size = ftell(rom);
+	rom_size = ftell(rom);
 	rewind(rom);
 
-	uint8_t *rom_buffer = (uint8_t *) malloc(sizeof(uint8_t) * rom_size);
+	rom_buffer = (uint8_t *) malloc(sizeof(uint8_t) * rom_size);
 	if (rom_buffer == NULL)
         die("Failed to allocate roms");
 
-	size_t result = fread(rom_buffer, sizeof(uint8_t), (size_t) rom_size, rom);
+	result = fread(rom_buffer, sizeof(uint8_t), (size_t) rom_size, rom);
 	if (result != rom_size)
         die("Failed to load roms");
 
