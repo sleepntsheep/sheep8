@@ -1,13 +1,12 @@
-#include "widget.h" 
+#include "button.h" 
 
-Button
-*btn_init(int x, int y, int w, int h, int r, int g, int b, char *text, void (*on_click)()) {
+Button *
+btn_init(int x, int y, int w, int h, SDL_Color bg, SDL_Color fg, char *text, void (*on_click)()) {
     Button *btn = malloc(sizeof(Button));
     btn->x = x; btn->w = w;
     btn->y = y; btn->h = h;
-    btn->r = r;
-    btn->g = g;
-    btn->b = b;
+    btn->fg = fg;
+    btn->bg = bg;
     btn->text = text;
     btn->on_click = on_click;
     return btn;
@@ -23,17 +22,16 @@ btn_draw(SDL_Renderer *renderer, Button *btn, TTF_Font *font) {
     SDL_Rect rect;
     rect.x = btn->x; rect.y = btn->y; rect.w = btn->w; rect.h = btn->h;
     
-	SDL_SetRenderDrawColor(renderer, btn->r, btn->g, btn->b, 0);
+	SDL_SetRenderDrawColor(renderer, btn->bg.r, btn->bg.g, btn->bg.b, btn->bg.a);
     SDL_RenderFillRect(renderer, &rect);
-    draw_text(renderer, btn->text, btn->x+btn->w/2, btn->y+btn->h/2, 1, font);
+    draw_text(renderer, btn->text, btn->x+btn->w/2, btn->y+btn->h/2, 1, font, btn->fg);
 }
 
 void
-draw_text(SDL_Renderer *renderer, char *text, int x, int y, int center, TTF_Font *font) {
+draw_text(SDL_Renderer *renderer, char *text, int x, int y, int center, TTF_Font *font, SDL_Color color) {
 	SDL_Rect dstrect;
 	int textW, textH;
 
-    SDL_Color color = {255,255,255};
 	SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 	SDL_QueryTexture(texture, NULL,  NULL, &textW, &textH);
