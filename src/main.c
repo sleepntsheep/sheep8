@@ -132,7 +132,7 @@ init(char *title, SDL_Window **window, SDL_Renderer **renderer, struct nk_contex
             struct nk_font *font;
 
             nk_sdl_font_stash_begin(&atlas);
-            font = nk_font_atlas_add_default(atlas, 18 *font_scale, &config);
+            font = nk_font_atlas_add_default(atlas, 16 *font_scale, &config);
             /*font = nk_font_atlas_add_from_file(atlas, "assets/terminus.ttf", 26 *font_scale, &config);*/
             nk_sdl_font_stash_end();
 
@@ -170,7 +170,6 @@ gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk
     nk_flags |= NK_WINDOW_BORDER;
     nk_flags |= NK_WINDOW_TITLE;
 #if 1
-    nk_flags |= NK_WINDOW_MINIMIZABLE;
     nk_flags |= NK_WINDOW_MOVABLE;
     nk_flags |= NK_WINDOW_SCALABLE;
 #endif
