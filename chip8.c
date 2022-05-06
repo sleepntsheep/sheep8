@@ -1,28 +1,37 @@
-#include <stdlib.h>
-#include <string.h>
 #include "chip8.h"
-#include "main.h"
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_events.h>
 
 Chip8
-*chip_init() {
+*chip_init(void)
+{
     Chip8 *newchip = calloc(1, sizeof(Chip8));
     newchip->pc = 0x200;
+    newchip->clockspeed = 400;
     loadfont(newchip);
     return newchip;
 }
 
 uint16_t
-getop(Chip8 *chip) {
+getop(Chip8 *chip)
+{
     return chip->memory[chip->pc] << 8 | chip->memory[chip->pc+1];
 }
 
 void
-clearscr(Chip8 *chip) {
+clearscr(Chip8 *chip)
+{
 	memset(chip->screen, 0, sizeof(int) * WIDTH * HEIGHT);
 }
 
 int
-flippixel(Chip8 *chip, int x, int y) {
+flippixel(Chip8 *chip, int x, int y)
+{
     /* return pixel before flipping */
 	if (y < 0 || y >= HEIGHT) return 0;
 	if (x < 0 || x >= WIDTH) return 0;
@@ -31,10 +40,11 @@ flippixel(Chip8 *chip, int x, int y) {
 }
 
 void
-interpretOP(Chip8 *chip, uint16_t op) {
+interpretOP(Chip8 *chip, uint16_t op)
+{
 	/* OP -> AxyB */
-	unsigned char x = (op & 0x0F00) >> 8;
-	unsigned char y = (op & 0x00F0) >> 4;
+	uint8_t x = (op & 0x0F00) >> 8;
+	uint8_t y = (op & 0x00F0) >> 4;
 
 	chip->pc += 2;
 
@@ -185,7 +195,7 @@ interpretOP(Chip8 *chip, uint16_t op) {
 				case 0x0A: {
                     SDL_Event event;
 					chip->v[x] = SDL_WaitEvent(&event);
-                    handle_event(chip, event);
+                    chip_handleevent(chip, event);
 					break;
                            }
 				case 0x15:
@@ -222,7 +232,8 @@ interpretOP(Chip8 *chip, uint16_t op) {
 }
 
 void
-loadfont(Chip8 *chip) {
+loadfont(Chip8 *chip)
+{
 	/* font for 0-F */
 	size_t n = sizeof(_fnts)/sizeof(*_fnts);
     int i;
@@ -232,7 +243,8 @@ loadfont(Chip8 *chip) {
 
 
 int
-loadrom(Chip8 *chip, char *path) {
+loadrom(Chip8 *chip, char *path)
+{
 	FILE *rom = NULL;
     size_t rom_size;
     uint8_t *rom_buffer;
@@ -240,7 +252,7 @@ loadrom(Chip8 *chip, char *path) {
 
     rom = fopen(path, "rb");
 	if (rom == NULL)
-        die("Failed to open roms");
+        return -1;
 
 	fseek(rom, 0, SEEK_END);
 	rom_size = ftell(rom);
@@ -248,20 +260,84 @@ loadrom(Chip8 *chip, char *path) {
 
 	rom_buffer = (uint8_t *) malloc(sizeof(uint8_t) * rom_size);
 	if (rom_buffer == NULL)
-        die("Failed to allocate roms");
+        return -1;
 
 	result = fread(rom_buffer, sizeof(uint8_t), (size_t) rom_size, rom);
 	if (result != rom_size)
-        die("Failed to load roms");
+        return -1;
 
 	if ((MEMORY_SIZE - 0x200) > rom_size)
         memcpy(chip->memory+0x200, rom_buffer, rom_size);
 	else 
-        die("Rom too large");
+        return -1;
 
 	fclose(rom);
 	free(rom_buffer);
 
-	return 1;
+	return 0;
 }
+
+void
+chip_handleevent(Chip8 *chip, SDL_Event evt)
+{
+    switch ( evt.type ) {
+        case SDL_KEYDOWN:
+        case SDL_KEYUP: {
+            int sym = evt.key.keysym.sym;
+            int keydown = (evt.type == SDL_KEYDOWN);
+            switch (sym) {
+                case SDLK_1:
+                    chip->state[0x1] = keydown;
+                    break;
+                case SDLK_2:
+                    chip->state[0x2] = keydown;
+                    break;
+                case SDLK_3:
+                    chip->state[0x3] = keydown;
+                    break;
+                case SDLK_4:
+                    chip->state[0xC] = keydown;
+                    break;
+                case SDLK_q:
+                    chip->state[0x4] = keydown;
+                    break;
+                case SDLK_w:
+                    chip->state[0x5] = keydown;
+                    break;
+                case SDLK_e:
+                    chip->state[0x6] = keydown;
+                    break;
+                case SDLK_r:
+                    chip->state[0xD] = keydown;
+                    break;
+                case SDLK_a:
+                    chip->state[0x7] = keydown;
+                    break;
+                case SDLK_s:
+                    chip->state[0x8] = keydown;
+                    break;
+                case SDLK_d:
+                    chip->state[0x9] = keydown;
+                    break;
+                case SDLK_f:
+                    chip->state[0xE] = keydown;
+                    break;
+                case SDLK_z:
+                    chip->state[0xA] = keydown;
+                    break;
+                case SDLK_x:
+                    chip->state[0x0] = keydown;
+                    break;
+                case SDLK_c:
+                    chip->state[0xB] = keydown;
+                    break;
+                case SDLK_v:
+                    chip->state[0xF] = keydown;
+                    break;
+            }
+            break;
+        }
+    }
+}
+
 

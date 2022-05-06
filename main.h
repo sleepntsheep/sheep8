@@ -1,42 +1,64 @@
 #ifndef MAIN_H
+#define MAIN_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+#include <limits.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_audio.h>
+#include <SDL2/SDL_video.h>
+#include <SDL2/SDL_events.h>
 
 #include "chip8.h"
+
+#define NK_INCLUDE_FIXED_TYPES
+#define NK_INCLUDE_STANDARD_IO
+#define NK_INCLUDE_STANDARD_VARARGS
+#define NK_INCLUDE_DEFAULT_ALLOCATOR
+#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+#define NK_INCLUDE_FONT_BAKING
+#define NK_INCLUDE_DEFAULT_FONT
+#define NK_IMPLEMENTATION
+#define NK_SDL_RENDERER_IMPLEMENTATION
+#include "nuklear/nuklear.h"
+#include "nuklear/nuklear_sdl_renderer.h"
 
 #define FONT_PATH "assets/terminus.ttf"
 #define SCALE 15
 #define FPS 60
 #define AMPLITUDE 28000
 #define FREQUENCY 44100
-#define lastOPcount 10
 #define SWIDTH WIDTH * SCALE
 #define SHEIGHT HEIGHT * SCALE
+#define GWIDTH 300
+#define GHEIGHT 200
 #define SAVEFILE "save"
 
-int
-init(char* title);
+void
+init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx);
 
 void
 die(const char *s);
 
 void
-display(Chip8 *chip);
+chip_display(Chip8 *chip, SDL_Renderer *renderer, int r, int g, int b, int a);
+
+void
+gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk_colorf *fg, int *paused)	;
 
 void
 updatetimer(Chip8 *chip);
 
 void
-quit(void);
+cleanup(void);
 
 void
 audio_callback(void* userdata, uint8_t* stream, int len);
