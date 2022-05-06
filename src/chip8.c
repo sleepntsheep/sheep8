@@ -234,7 +234,7 @@ loadfont(Chip8 *chip)
 {
 	/* font for 0-F */
 	size_t n = sizeof(_fnts)/sizeof(*_fnts);
-    int i;
+    size_t i;
     for (i = 0; i < n; i++)
 		chip->memory[i] = _fnts[i];
 }

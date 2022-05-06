@@ -329,7 +329,7 @@ gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk
         char buf[100];
 
         int i;
-        for (i = 0; i < sizeof chip->stack / sizeof *chip->stack; i++) {
+        for (i = 0; i < (int)(sizeof chip->stack / sizeof *chip->stack); i++) {
             sprintf(buf, "%2X %4X", i, chip->stack[i]);
             nk_layout_row_dynamic(ctx, 15, 1);
             if (chip->stack[i])
