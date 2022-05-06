@@ -19,18 +19,17 @@ int
 main(int argc, char** argv)
 {
 
-    SDL_Window* win = NULL;
-    SDL_Renderer* renderer = NULL;
-    Chip8* chip;
+    SDL_Window *win = NULL;
+    SDL_Renderer *renderer = NULL;
+    Chip8 *chip;
     uint64_t next_game_step = SDL_GetTicks();
     char path[PATH_MAX] = { 0 };
 
     int running = 1;
     int paused = 0;
 
-    struct nk_context* ctx;
+    struct nk_context *ctx;
     struct nk_colorf bg, fg;
-
     
     bg.r = 61 / 255.0f, bg.g = 38 / 255.0f, bg.b = 66 / 255.0f, bg.a = 1.0f;
     fg.r = 1.0f, fg.g = 1.0f, fg.b = 1.0f, fg.a = 1.0f;
@@ -41,7 +40,7 @@ main(int argc, char** argv)
 	    init("Chip8 Emulator: Select Rom", &win, &renderer, &ctx, &chip);
     }
     else {
-        strncpy(path, argv[1], PATH_MAX);
+        strncpy(path, argv[1], PATH_MAX-1);
 	    init(argv[1], &win, &renderer, &ctx, &chip);
 	    loadrom(chip, argv[1]);
     }
@@ -49,7 +48,7 @@ main(int argc, char** argv)
     while (running)
     {
         uint64_t now = SDL_GetTicks64();
-        /* Input */
+        / *Input */
         SDL_Event evt;
         nk_input_begin(ctx);
         while (SDL_PollEvent(&evt)) {
@@ -70,12 +69,12 @@ main(int argc, char** argv)
 
             gui_display(ctx, chip, &bg, &fg, &paused, path);
 
-            SDL_SetRenderDrawColor(renderer, bg.r * 255, bg.g * 255, bg.b * 255, bg.a * 255);
+            SDL_SetRenderDrawColor(renderer, bg.r  *255, bg.g  *255, bg.b  *255, bg.a  *255);
             SDL_RenderClear(renderer);
 
             nk_sdl_render(NK_ANTI_ALIASING_ON);
 
-            chip_display(chip, renderer, fg.r * 255, fg.g * 255, fg.b * 255, fg.a * 255);
+            chip_display(chip, renderer, fg.r  *255, fg.g  *255, fg.b  *255, fg.a  *255);
 
             SDL_RenderPresent(renderer);
 
@@ -90,7 +89,7 @@ main(int argc, char** argv)
 }
 
 void
-init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx, Chip8 **chip)
+init(char *title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx, Chip8 **chip)
 {
     *chip = chip_init();
 
@@ -134,8 +133,8 @@ init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_contex
             struct nk_font *font;
 
             nk_sdl_font_stash_begin(&atlas);
-            font = nk_font_atlas_add_default(atlas, 18 * font_scale, &config);
-            /*font = nk_font_atlas_add_from_file(atlas, "assets/terminus.ttf", 26 * font_scale, &config);*/
+            font = nk_font_atlas_add_default(atlas, 18 *font_scale, &config);
+            /*font = nk_font_atlas_add_from_file(atlas, "assets/terminus.ttf", 26 *font_scale, &config);*/
             nk_sdl_font_stash_end();
 
             font->handle.height /= font_scale;
@@ -413,9 +412,9 @@ handle_event(Chip8 *chip, SDL_Event event) {
 }
 
 void
-audio_callback(void* userdata, uint8_t* stream, int len) {
-    uint64_t* samples_played = (uint64_t*)userdata;
-    float* fstream = (float*)(stream);
+audio_callback(void *userdata, uint8_t *stream, int len) {
+    uint64_t *samples_played = (uint64_t*)userdata;
+    float *fstream = (float*)(stream);
 
     static const float volume = 0.2;
     static const float frequency = 441.0;
