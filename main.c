@@ -3,30 +3,48 @@
 
 #define green (nk_rgb(0,255,0))
 
+#if defined _WIN32 && !defined __CYGWIN__
+#define SDL_MAIN_HANDLED
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+SDL_AudioSpec audiowant, audiohave;
+uint64_t audio_played = 0;
+SDL_AudioDeviceID audio_id;
+    
 int
-main(int argc, char *argv[])
+main(int argc, char** argv)
 {
-    SDL_Window *win = NULL;
-    SDL_Renderer *renderer = NULL;
-    Chip8 *chip;
+
+    SDL_Window* win = NULL;
+    SDL_Renderer* renderer = NULL;
+    Chip8* chip;
     uint64_t next_game_step = SDL_GetTicks();
+    char path[PATH_MAX] = { 0 };
 
     int running = 1;
     int paused = 0;
 
-    struct nk_context *ctx;
+    struct nk_context* ctx;
     struct nk_colorf bg, fg;
 
-    bg.r = 61/255.0f, bg.g = 38/255.0f, bg.b = 66/255.0f, bg.a = 1.0f;
+    
+    bg.r = 61 / 255.0f, bg.g = 38 / 255.0f, bg.b = 66 / 255.0f, bg.a = 1.0f;
     fg.r = 1.0f, fg.g = 1.0f, fg.b = 1.0f, fg.a = 1.0f;
 
-    if (argc < 2)
-        die("Please give rom path in argv");
+    atexit(cleanup);
 
-    init(argv[1], &win, &renderer, &ctx);
-
-    chip = chip_init();
-    loadrom(chip, argv[1]);
+    if (argc < 2) {
+	    init("Chip8 Emulator: Select Rom", &win, &renderer, &ctx, &chip);
+    }
+    else {
+        strncpy(path, argv[1], PATH_MAX);
+	    init(argv[1], &win, &renderer, &ctx, &chip);
+	    loadrom(chip, argv[1]);
+    }
 
     while (running)
     {
@@ -35,9 +53,7 @@ main(int argc, char *argv[])
         SDL_Event evt;
         nk_input_begin(ctx);
         while (SDL_PollEvent(&evt)) {
-            if (evt.type == SDL_QUIT) exit(0);
-            chip_handleevent(chip, evt);
-            nk_sdl_handle_event(&evt);
+            handle_event(chip, evt);
         }
         nk_input_end(ctx);
 
@@ -52,7 +68,7 @@ main(int argc, char *argv[])
                 updatetimer(chip);
             }
 
-            gui_display(ctx, chip, &bg, &fg, &paused);
+            gui_display(ctx, chip, &bg, &fg, &paused, path);
 
             SDL_SetRenderDrawColor(renderer, bg.r * 255, bg.g * 255, bg.b * 255, bg.a * 255);
             SDL_RenderClear(renderer);
@@ -74,26 +90,26 @@ main(int argc, char *argv[])
 }
 
 void
-init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx)
+init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx, Chip8 **chip)
 {
-    atexit(cleanup);
+    *chip = chip_init();
 
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS);
 
     *window = SDL_CreateWindow(title,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         SWIDTH+GWIDTH, SHEIGHT+GHEIGHT, SDL_WINDOW_SHOWN|SDL_WINDOW_ALLOW_HIGHDPI);
 
+    *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+    *ctx = nk_sdl_init(*window, *renderer);
+
     if (!window)
         die(SDL_GetError());
 
-    *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
     if (!renderer)
         die(SDL_GetError());
-
-    *ctx = nk_sdl_init(*window, *renderer);
 
     /* nk font init */
     {
@@ -127,10 +143,29 @@ init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_contex
             nk_style_set_font(*ctx, &font->handle);
         }
     }
+
+
+    /* audio init */
+    {
+        audiowant.freq = 44100;
+        audiowant.format = AUDIO_F32;
+        audiowant.channels = 2;
+        audiowant.samples = 512;
+        audiowant.callback = audio_callback;
+        audiowant.userdata = (void*)&audio_played;
+
+        audio_id = SDL_OpenAudioDevice(
+            NULL, 0, &audiowant, &audiohave, SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+        if (!audio_id)
+            die(SDL_GetError());
+
+        SDL_PauseAudioDevice(audio_id, 0);
+    }
 }
 
 void
-gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk_colorf *fg, int *paused)
+gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk_colorf *fg, int *paused, char *rompath)
 {
     int nk_flags = 0;
 
@@ -172,6 +207,22 @@ gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk
 
         nk_layout_row_dynamic(ctx, 25, 1);
         nk_property_int(ctx, "Clock (Hz):", 0, &chip->clockspeed, 2000, 50, 1);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_label(ctx, "Rom path", NK_TEXT_LEFT);
+        nk_edit_string_zero_terminated(ctx,
+            NK_EDIT_BOX | NK_EDIT_AUTO_SELECT,
+            rompath, PATH_MAX, nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 25, 1);
+        if (nk_button_label(ctx, "Load rom")) {
+            memset(chip, 0, sizeof(Chip8));
+            chip->pc = 0x200;
+            chip->clockspeed = DEFAULT_CLOCK;
+            loadfont(chip);
+            loadrom(chip, rompath);
+        }
+
         nk_end(ctx);
     }
 
@@ -336,7 +387,7 @@ updatetimer(Chip8 *chip) {
         chip->delayTimer--;
     if (chip->soundTimer > 0)
         chip->soundTimer--;
-/*    SDL_PauseAudioDevice(audio_device_id, !chip->soundTimer);*/
+    SDL_PauseAudioDevice(audio_id, !chip->soundTimer);
 }
 
 void
@@ -351,9 +402,31 @@ cleanup(void)
 {
     nk_sdl_shutdown();
     SDL_Quit();
+    exit(0);
 }
 
 void
 handle_event(Chip8 *chip, SDL_Event event) {
+    if (event.type == SDL_QUIT) exit(0);
+    chip_handleevent(chip, event);
+    nk_sdl_handle_event(&event);
+}
 
+void
+audio_callback(void* userdata, uint8_t* stream, int len) {
+    uint64_t* samples_played = (uint64_t*)userdata;
+    float* fstream = (float*)(stream);
+
+    static const float volume = 0.2;
+    static const float frequency = 441.0;
+
+    int sid;
+    for (sid = 0; sid < (len / 8); ++sid) {
+        double time = (*samples_played + sid) / 44100.0;
+        double x = 2.0 * 3.14159 * time * frequency;
+        fstream[2 * sid + 0] = volume * sin(x);
+        fstream[2 * sid + 1] = volume * sin(x);
+    }
+
+    *samples_played += len / 8;
 }

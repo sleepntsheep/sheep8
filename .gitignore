@@ -1,2 +1,6 @@
 emu
 save
+
+*.sln
+*.vcxproj*
+x64

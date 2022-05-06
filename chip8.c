@@ -4,17 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_events.h>
-
 Chip8
 *chip_init(void)
 {
-    Chip8 *newchip = calloc(1, sizeof(Chip8));
-    newchip->pc = 0x200;
-    newchip->clockspeed = 400;
-    loadfont(newchip);
-    return newchip;
+	Chip8 *chip;
+	chip = calloc(1, sizeof(Chip8));
+    chip->pc = 0x200;
+    chip->clockspeed = DEFAULT_CLOCK;
+    loadfont(chip);
+	return chip;
 }
 
 uint16_t

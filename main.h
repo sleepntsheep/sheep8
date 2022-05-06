@@ -11,11 +11,24 @@
 #include <limits.h>
 #include <time.h>
 
+#if defined _WIN32 && !defined __MINGW32__
+#include "SDL.h"
+#include "SDL_ttf.h"
+#include "SDL_audio.h"
+#include "SDL_video.h"
+#include "SDL_events.h"
+#else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_audio.h>
 #include <SDL2/SDL_video.h>
 #include <SDL2/SDL_events.h>
+#endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 
 #include "chip8.h"
 
@@ -43,7 +56,7 @@
 #define SAVEFILE "save"
 
 void
-init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx);
+init(char* title, SDL_Window **window, SDL_Renderer **renderer, struct nk_context **ctx, Chip8 **chip);
 
 void
 die(const char *s);
@@ -52,7 +65,7 @@ void
 chip_display(Chip8 *chip, SDL_Renderer *renderer, int r, int g, int b, int a);
 
 void
-gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk_colorf *fg, int *paused)	;
+gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk_colorf *fg, int *paused, char *rompath);
 
 void
 updatetimer(Chip8 *chip);

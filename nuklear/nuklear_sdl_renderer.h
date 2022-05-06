@@ -11,7 +11,11 @@
 #ifndef NK_SDL_RENDERER_H_
 #define NK_SDL_RENDERER_H_
 
+#if defined _WIN32 && !defined __MINGW32__
+#include "SDL.h"
+#else
 #include <SDL2/SDL.h>
+#endif
 NK_API struct nk_context*   nk_sdl_init(SDL_Window *win, SDL_Renderer *renderer);
 NK_API void                 nk_sdl_font_stash_begin(struct nk_font_atlas **atlas);
 NK_API void                 nk_sdl_font_stash_end(void);
@@ -40,7 +44,6 @@ NK_API void                 nk_sdl_shutdown(void);
  */
 #ifdef NK_SDL_RENDERER_IMPLEMENTATION
 
-#include <strings.h>
 
 struct nk_sdl_device {
     struct nk_buffer cmds;
