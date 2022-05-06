@@ -14,15 +14,14 @@
 SDL_AudioSpec audiowant, audiohave;
 uint64_t audio_played = 0;
 SDL_AudioDeviceID audio_id;
-    
-int
-main(int argc, char** argv)
-{
 
+int
+main(int argc, char *argv[])
+{
     SDL_Window *win = NULL;
     SDL_Renderer *renderer = NULL;
     Chip8 *chip;
-    uint64_t next_game_step = SDL_GetTicks();
+    uint64_t next_game_step = SDL_GetTicks64();
     char path[PATH_MAX] = { 0 };
 
     int running = 1;
@@ -39,7 +38,7 @@ main(int argc, char** argv)
     if (argc < 2) {
 	    init("Chip8 Emulator: Select Rom", &win, &renderer, &ctx, &chip);
     }
-    else {
+    else if (argc > 5) {
         strncpy(path, argv[1], PATH_MAX-1);
 	    init(argv[1], &win, &renderer, &ctx, &chip);
 	    loadrom(chip, argv[1]);
@@ -48,7 +47,7 @@ main(int argc, char** argv)
     while (running)
     {
         uint64_t now = SDL_GetTicks64();
-        / *Input */
+        /* Input */
         SDL_Event evt;
         nk_input_begin(ctx);
         while (SDL_PollEvent(&evt)) {
@@ -226,8 +225,9 @@ gui_display(struct nk_context *ctx, Chip8 *chip, struct nk_colorf *bg, struct nk
     }
 
     if (nk_begin(ctx, "Control", nk_rect(560, 0, 200, GHEIGHT), nk_flags)) {
-        nk_layout_row_dynamic(ctx, 25, 1);
+
         /* toggle paused */
+        nk_layout_row_dynamic(ctx, 25, 1);
         if (nk_button_label(ctx, *paused ? "Resume" : "Pause"))
             *paused ^= 1;
 
