@@ -1,0 +1,16 @@
+﻿  main.c
+D:\doc\code\chip8-emu\nuklear\nuklear.h(8865,38): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(9490,44): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(9519,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(9630,43): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(9827,46): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(10046,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(16470,41): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(16471,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(16472,41): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(16473,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(16474,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear.h(19282,42): warning C4116: unnamed type definition in parentheses
+D:\doc\code\chip8-emu\nuklear\nuklear_sdl_renderer.h(118,35): warning C4116: unnamed type definition in parentheses
+LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/FORCE' specification
+  chip8-emu.vcxproj -> D:\doc\code\chip8-emu\x64\Debug\chip8-emu.exe
