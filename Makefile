@@ -8,11 +8,6 @@ LIB	 := lib
 LIBRARIES   := `sdl2-config --libs` -ldl -lm
 EXECUTABLE  := sheep8
 
-ifeq ($(OS), Windows_NT)
-	CFLAGS += '-lmingw32'
-	LIBRARIES += -lSDL2main
-endif
-
 all: $(BIN)/$(EXECUTABLE)
 
 run: clean all

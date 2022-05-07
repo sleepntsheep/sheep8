@@ -19,7 +19,6 @@
 #include "SDL_events.h"
 #else
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_audio.h>
 #include <SDL2/SDL_video.h>
 #include <SDL2/SDL_events.h>
