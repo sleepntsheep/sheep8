@@ -43,7 +43,6 @@
 #include "nuklear/nuklear.h"
 #include "nuklear/nuklear_sdl_renderer.h"
 
-#define FONT_PATH "assets/terminus.ttf"
 #define SCALE 15
 #define FPS 60
 #define AMPLITUDE 28000

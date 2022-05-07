@@ -3,3 +3,6 @@ save
 
 *.sln
 *.vcxproj*
+
+build
+

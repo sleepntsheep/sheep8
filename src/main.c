@@ -16,11 +16,7 @@ uint64_t audio_played = 0;
 SDL_AudioDeviceID audio_id;
 
 int
-#ifdef _MINGW32_
-WinMain(int argc, char *argv[])
-#else
 main(int argc, char *argv[])
-#endif
 {
     SDL_Window *win = NULL;
     SDL_Renderer *renderer = NULL;

@@ -1,4 +1,25 @@
-# Chip8 emulator in c
+# Chip8 emulator in C
+
+### Development
+
+on linux:
+
+```sh
+mkdir build
+cd build
+cmake ..
+make
+../bin/sheep8
+```
+
+on mingw:
+```sh
+mkdir build
+cd build
+cmake .. -G "MinGW Makefiles"
+make
+../bin/sheep8
+```
 
 ### Reference/Resource:
 
@@ -13,10 +34,8 @@ http://nicktasios.nl/posts/making-sounds-using-sdl-and-visualizing-them-on-a-sim
 
 ### Todo:
 
-- [x] refactor
-- [ ] text entry widget for changing values intuitivly
-- [ ] better way for user to specify roms filepath than argv[1]
+- [ ] refactor
+- [x] better way for user to specify roms filepath than argv[1]
 - [x] sound
-- [x] fix bugs 
 - [x] keyboard
 - [x] buttons
