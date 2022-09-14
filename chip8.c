@@ -1,34 +1,30 @@
 #include "chip8.h"
+#include <raylib.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-Chip8
-*chip_init(void)
+void chip8_init(Chip8 *chip)
 {
-	Chip8 *chip;
-	chip = calloc(1, sizeof(Chip8));
+    memset(chip, 0, sizeof *chip);
     chip->pc = 0x200;
+    chip->paused = false;
     chip->clockspeed = DEFAULT_CLOCK;
-    loadfont(chip);
-	return chip;
+    chip8_loadfont(chip);
 }
 
-uint16_t
-getop(Chip8 *chip)
+uint16_t chip8_getop(Chip8 chip)
 {
-    return chip->memory[chip->pc] << 8 | chip->memory[chip->pc+1];
+    return chip.memory[chip.pc] << 8 | chip.memory[chip.pc+1];
 }
 
-void
-clearscr(Chip8 *chip)
+void chip8_clearscr(Chip8 *chip)
 {
 	memset(chip->screen, 0, sizeof(int) * WIDTH * HEIGHT);
 }
 
-int
-flippixel(Chip8 *chip, int x, int y)
+int chip8_flippixel(Chip8 *chip, int x, int y)
 {
     /* return pixel before flipping */
 	if (y < 0 || y >= HEIGHT) return 0;
@@ -37,9 +33,10 @@ flippixel(Chip8 *chip, int x, int y)
 	return !chip->screen[y][x];
 }
 
-void
-interpretOP(Chip8 *chip, uint16_t op)
+void chip8_interpretop(Chip8 *chip, uint16_t op)
 {
+    if (chip->paused || chip->waiting_for_key)
+        return;
 	/* OP -> AxyB */
 	uint8_t x = (op & 0x0F00) >> 8;
 	uint8_t y = (op & 0x00F0) >> 4;
@@ -51,7 +48,7 @@ interpretOP(Chip8 *chip, uint16_t op)
 			switch (op) {
 				case 0x00E0:
 					/* CLR */
-                    clearscr(chip);
+                    chip8_clearscr(chip);
 					break;
 				case 0x00EE:
 					/* RET */
@@ -154,8 +151,8 @@ interpretOP(Chip8 *chip, uint16_t op)
 		case 0xD000:
 			{
 				/* DRW, Vx, Vy, nibble */
-				unsigned char width = 8;
-				unsigned char height = op & 0xF;
+				int width = 8;
+				int height = op & 0xF;
 				int row, col;
 				chip->v[0xF] = 0;
 				for (row = 0; row < height; row++) {
@@ -163,7 +160,7 @@ interpretOP(Chip8 *chip, uint16_t op)
 
 					for (col = 0; col < width; col++) {
 						if ((sprite & 0x80) > 0) {
-							if (flippixel(chip, chip->v[x] + col, chip->v[y] + row))  {
+							if (chip8_flippixel(chip, chip->v[x] + col, chip->v[y] + row))  {
 								chip->v[0xF] = 1;
 								/* if register 0xF is set to 1, collision happened */
 							}
@@ -188,19 +185,16 @@ interpretOP(Chip8 *chip, uint16_t op)
 		case 0xF000:
 			switch (op & 0x00FF) {
 				case 0x07:
-					chip->v[x] = chip->delayTimer;
+					chip->v[x] = chip->delaytimer;
 					break;
-				case 0x0A: {
-                    SDL_Event event;
-					chip->v[x] = SDL_WaitEvent(&event);
-                    chip_handleevent(chip, event);
+				case 0x0A:
+                    chip->waiting_for_key = true;
 					break;
-                           }
 				case 0x15:
-					chip->delayTimer = chip->v[x];
+					chip->delaytimer = chip->v[x];
 					break;
 				case 0x18:
-					chip->soundTimer = chip->v[x];
+					chip->soundtimer = chip->v[x];
 					break;
 				case 0x1E:
 					chip->idx += chip->v[x];
@@ -229,8 +223,7 @@ interpretOP(Chip8 *chip, uint16_t op)
 	}
 }
 
-void
-loadfont(Chip8 *chip)
+void chip8_loadfont(Chip8 *chip)
 {
 	/* font for 0-F */
 	size_t n = sizeof(_fnts)/sizeof(*_fnts);
@@ -239,9 +232,7 @@ loadfont(Chip8 *chip)
 		chip->memory[i] = _fnts[i];
 }
 
-
-int
-loadrom(Chip8 *chip, char *path)
+int chip8_loadrom(Chip8 *chip, char *path)
 {
 	FILE *rom = NULL;
     size_t rom_size;
@@ -275,67 +266,30 @@ loadrom(Chip8 *chip, char *path)
 	return 0;
 }
 
-void
-chip_handleevent(Chip8 *chip, SDL_Event evt)
+void chip8_doevent(Chip8 *chip)
 {
-    switch ( evt.type ) {
-        case SDL_KEYDOWN:
-        case SDL_KEYUP: {
-            int sym = evt.key.keysym.sym;
-            int keydown = (evt.type == SDL_KEYDOWN);
-            switch (sym) {
-                case SDLK_1:
-                    chip->state[0x1] = keydown;
-                    break;
-                case SDLK_2:
-                    chip->state[0x2] = keydown;
-                    break;
-                case SDLK_3:
-                    chip->state[0x3] = keydown;
-                    break;
-                case SDLK_4:
-                    chip->state[0xC] = keydown;
-                    break;
-                case SDLK_q:
-                    chip->state[0x4] = keydown;
-                    break;
-                case SDLK_w:
-                    chip->state[0x5] = keydown;
-                    break;
-                case SDLK_e:
-                    chip->state[0x6] = keydown;
-                    break;
-                case SDLK_r:
-                    chip->state[0xD] = keydown;
-                    break;
-                case SDLK_a:
-                    chip->state[0x7] = keydown;
-                    break;
-                case SDLK_s:
-                    chip->state[0x8] = keydown;
-                    break;
-                case SDLK_d:
-                    chip->state[0x9] = keydown;
-                    break;
-                case SDLK_f:
-                    chip->state[0xE] = keydown;
-                    break;
-                case SDLK_z:
-                    chip->state[0xA] = keydown;
-                    break;
-                case SDLK_x:
-                    chip->state[0x0] = keydown;
-                    break;
-                case SDLK_c:
-                    chip->state[0xB] = keydown;
-                    break;
-                case SDLK_v:
-                    chip->state[0xF] = keydown;
-                    break;
-            }
-            break;
-        }
-    }
+    chip->state[1] = IsKeyDown(KEY_ONE);
+    chip->state[2] = IsKeyDown(KEY_TWO);
+    chip->state[3] = IsKeyDown(KEY_THREE);
+    chip->state[0xC] = IsKeyDown(KEY_FOUR);
+    chip->state[4] = IsKeyDown(KEY_Q);
+    chip->state[5] = IsKeyDown(KEY_W);
+    chip->state[6] = IsKeyDown(KEY_E);
+    chip->state[0xD] = IsKeyDown(KEY_R);
+    chip->state[7] = IsKeyDown(KEY_A);
+    chip->state[8] = IsKeyDown(KEY_S);
+    chip->state[9] = IsKeyDown(KEY_D);
+    chip->state[0xE] = IsKeyDown(KEY_F);
+    chip->state[0xA] = IsKeyDown(KEY_Z);
+    chip->state[0] = IsKeyDown(KEY_X);
+    chip->state[0xB] = IsKeyDown(KEY_C);
+    chip->state[0xF] = IsKeyDown(KEY_V);
 }
 
-
+void chip8_updatetimer(Chip8 *chip)
+{
+    if (chip->delaytimer > 0)
+        chip->delaytimer--;
+    if (chip->soundtimer > 0)
+        chip->soundtimer--;
+}
