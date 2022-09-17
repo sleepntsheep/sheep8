@@ -9,12 +9,20 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
+#ifdef PLATFORM_WEB
+#include <emscripten/emscripten.h>
+#endif
+
 typedef struct {
     AudioDriver audio;
     Color fg, bg;
     Chip8 chip;
     bool show_gui;
     char rom[4096];
+#ifdef PLATFORM_WEB
+    int selected_preset_rom;
+    bool dropdown_edit_mode;
+#endif
 } App;
 
 App app = {
@@ -25,23 +33,16 @@ App app = {
 };
 
 #ifdef PLATFORM_WEB
-#include <emscripten/emscripten.h>
-
 EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
     Chip8_Init(&app.chip);
     Chip8_LoadRom(&app.chip, buf, size);
     return 1;
 }
-
-int dropdownactive = 0;
-bool dropdowneditmode = false;
-
 static const char *preset_roms[] = {
     "roms/BRIX",
     "roms/octopaint.ch8",
     "roms/TETRIS",
 };
-
 #endif
 
 
@@ -96,10 +97,11 @@ void AppMainLoop()
             file_selector.click();
         );
 
-        if (GuiDropdownBox((Rectangle){100, 130, 100, 70}, "#01#BRIX;#02#Octopaint;#03#Tetris", &dropdownactive, dropdowneditmode)) {
-            dropdowneditmode ^= 1;
+        if (GuiDropdownBox((Rectangle){100, 130, 100, 70}, "#01#BRIX;#02#Octopaint;#03#Tetris",
+                    &app.selected_preset_rom, app.dropdowneditmode)) {
+            app.dropdowneditmode ^= 1;
             Chip8_Init(&app.chip);
-            Chip8_LoadRomFromFile(&app.chip, preset_roms[dropdownactive]);
+            Chip8_LoadRomFromFile(&app.chip, preset_roms[app.selected_preset_rom]);
         }
 #endif
 
