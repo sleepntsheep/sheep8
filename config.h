@@ -2,7 +2,6 @@
 #define SHEEP8_CONFIG_H
 
 static const int scale = 15;
-static const int fps = 60;
 static const char *savefile = "save";
 
 #endif /* SHEEP8_CONFIG_H */
