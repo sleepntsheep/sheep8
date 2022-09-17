@@ -74,12 +74,12 @@ void AppMainLoop()
 
     if (!app.show_gui) {
         if (GuiButton((Rectangle){0, 0, 10, 10}, "O"))
-            app.show_gui = 1;
+            app.show_gui = true;
     } else {
         app.fg = GuiColorPicker((Rectangle){150,0,100,100}, "FG Color", app.fg);
         app.bg = GuiColorPicker((Rectangle){0,0,100,100}, "BG Color", app.bg);
         if (GuiButton((Rectangle){0, 270, 150, 50}, "Close GUI"))
-            app.show_gui = 0;
+            app.show_gui = false;
 
         app.chip.clockspeed = GuiSliderPro((Rectangle){30, 100, 200, 30}, "0 Hz", "2000 Hz", app.chip.clockspeed, 0, 2000, 20);
 
@@ -90,12 +90,12 @@ void AppMainLoop()
         }
 #else
         if (GuiButton((Rectangle){0, 130, 100, 70}, "UPLOAD ROM"))
-        EM_ASM(
-            var file_selector = document.createElement('input');
-            file_selector.setAttribute('type', 'file');
-            file_selector.setAttribute('onchange','open_file(event)');
-            file_selector.click();
-        );
+            EM_ASM(
+                var file_selector = document.createElement('input');
+                file_selector.setAttribute('type', 'file');
+                file_selector.setAttribute('onchange','open_file(event)');
+                file_selector.click();
+            );
 
         if (GuiDropdownBox((Rectangle){100, 130, 100, 70}, "#01#BRIX;#02#Octopaint;#03#Tetris",
                     &app.selected_preset_rom, app.dropdowneditmode)) {

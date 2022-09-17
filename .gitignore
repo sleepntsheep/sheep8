@@ -3,6 +3,8 @@ save
 
 *.sln
 *.vcxproj*
+wasm/*
+sheep8
 
 build
 

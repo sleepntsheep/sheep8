@@ -10,7 +10,7 @@
 #define HEIGHT 32
 #define MEMORY_SIZE 30000
 #define NUM_REGISTERS 16
-#define DEFAULT_CLOCK 500
+#define DEFAULT_CLOCK 700
 
 typedef struct {
     bool op_8xy6_8xye_do_vy;
