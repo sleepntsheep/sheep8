@@ -15,11 +15,11 @@ typedef struct {
     short *buffer;
     int wavelength;
     bool playing;
-} AudioDriver;
+} audio_driver;
 
-AudioDriver AudioDriver_Init();
-void AudioDriver_Play(AudioDriver *driver);
-void AudioDriver_Pause(AudioDriver *driver);
-void AudioDriver_Drop(AudioDriver *driver);
+audio_driver audio_driver_Init();
+void audio_driver_Play(audio_driver *driver);
+void audio_driver_Pause(audio_driver *driver);
+void audio_driver_Drop(audio_driver *driver);
 
 #endif /* CHIP8_AUDIO_H */

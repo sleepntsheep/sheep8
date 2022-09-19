@@ -16,14 +16,14 @@ typedef struct {
     bool op_8xy6_8xye_do_vy;
     bool op_fx55_fx65_increment;
     bool op_8xy1_2_3_reset_vf;
-} Chip8Settings;
+    bool screen_wrap_around;
+} chip8_settings;
 
 typedef struct {
     bool key_waiting;
     bool register_waiting;
     uint32_t keys;
-    uint32_t clockspeed;
-    bool paused;
+    int clockspeed;
     uint16_t i;
     uint16_t pc; /* program counter */
     uint8_t memory[MEMORY_SIZE]; /* memory for loading the ROM - 2kb */
@@ -32,7 +32,8 @@ typedef struct {
     bool screen[HEIGHT*2][WIDTH*2];
     uint8_t delaytimer, soundtimer; /* sound timer */
     uint8_t sp; /* stack pointer */
-} Chip8;
+    chip8_settings settings;
+} chip8;
 
 static const uint8_t fonts[] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,
@@ -53,20 +54,16 @@ static const uint8_t fonts[] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80
 };
 
-int Chip8_LoadRom(Chip8 *chip, uint8_t *buf, size_t size);
+void chip8_load_rom(chip8 *chip, uint8_t *buf, size_t size);
 
-int Chip8_LoadRomFromFile(Chip8 *chip, char* path);
+int chip8_load_rom_from_file(chip8 *chip, const char* path);
 
-void Chip8_Init(Chip8 *chip);
+void chip8_init(chip8 *chip);
 
-void Chip8_UpdateTimer(Chip8 *chip);
+void chip8_update_timer(chip8 *chip);
 
-void Chip8_Interpret(Chip8 *chip);
+void chip8_interpret(chip8 *chip);
 
-void Chip8_DoEvent(Chip8 *chip);
-
-void Chip8_Input(Chip8 *chip);
-
-void Chip8_WaitForKey(Chip8 *chip, int reg);
+void chip8_wait_for_key(chip8 *chip, int reg);
 
 #endif
