@@ -249,12 +249,14 @@ void chip8_load_rom(chip8 *chip, uint8_t *buf, size_t size)
 {
     chip->pc = 0x200;
     chip->i = 0;
+    memset(chip->screen, 0, sizeof chip->screen);
     memcpy(chip->memory+0x200, buf, size);
 }
 
 int chip8_load_rom_from_file(chip8 *chip, const char *path)
 {
     chip->pc = 0x200;
+    memset(chip->screen, 0, sizeof chip->screen);
     chip->i = 0;
 	FILE *rom = fopen(path, "rb");
 	if (rom == NULL) {
