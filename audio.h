@@ -2,7 +2,6 @@
 #ifndef CHIP8_AUDIO_H
 #define CHIP8_AUDIO_H
 
-#include <raylib.h>
 #include <stdbool.h>
 #include <math.h>
 
@@ -10,7 +9,6 @@
 #define MAX_SAMPLES_PER_UPDATE   4096
 
 typedef struct {
-    AudioStream stream;
     short *data;
     short *buffer;
     int wavelength;
