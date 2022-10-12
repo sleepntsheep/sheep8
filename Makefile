@@ -1,11 +1,11 @@
 CFLAGS := -std=c99 -g -pedantic -Wall -Wextra
 LIBS := -lSDL2 -lSDL2_ttf -lm
-SRCS := main.c chip8.c
+SRCS := main.c chip8.c beeper.c
 
 all: sheep8
 
 sheep8: $(SRCS)
-	cc $(SRCS) -o $@ $(CFLAGS) $(LIBS)
+	$(CC) $(SRCS) -o $@ $(CFLAGS) $(LIBS)
 
 web: $(SRCS)
 	emcc -o wasm/sheep8.html $(SRCS) -Os -Wall \

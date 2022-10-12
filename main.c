@@ -1,9 +1,7 @@
-#include <SDL2/SDL.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "audio.h"
-#include "chip8.h"
+
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_BOOL
 #define NK_INCLUDE_STANDARD_IO
@@ -16,9 +14,15 @@
 #define NK_SDL_RENDERER_IMPLEMENTATION
 #include "nuklear.h"
 #include "nuklear_sdl_renderer.h"
+#include <SDL2/SDL.h>
 #ifdef PLATFORM_WEB
 #include <emscripten/emscripten.h>
 #endif
+
+#define SHEEP_LOG_IMPLEMENTATION
+#include "log.h"
+#include "chip8.h"
+#include "beeper.h"
 
 #ifdef SDL_GetTicks64
 #define SDL_GetTicksCompat SDL_GetTicks64
@@ -27,6 +31,16 @@
 #endif
 
 #define LENGTH(a) (sizeof(a) / sizeof(*(a)))
+
+#ifdef PLATFORM_WEB
+EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
+    chip8_load_rom(&global_app.chip, buf, size);
+    return 1;
+}
+EM_JS(int, canvas_get_width, (), { return canvas.width; });
+EM_JS(int, canvas_get_height, (), { return canvas.height; });
+static const char *preset_roms[] = { "roms/BRIX", "roms/octopaint.ch8", "roms/TETRIS" };
+#endif
 
 static const int kb2pad[] = {
     [SDLK_1] = 1+1, [SDLK_2] = 2+1, [SDLK_3] = 3+1, [SDLK_4] = 0xC+1,
@@ -39,9 +53,9 @@ static const int kb2pad[] = {
 static const int gui_top_px = 60;
 
 struct app {
+    bool quit;
     SDL_Window *win;
     SDL_Renderer *renderer;
-    audio_driver audio;
     chip8 chip;
     int tab;
     bool touchscreen_keypad;
@@ -49,6 +63,7 @@ struct app {
     struct nk_context *nk;
     uint64_t tick_a, tick_b;
     int w, h;
+    struct beeper beeper;
 #ifdef PLATFORM_WEB
     int selected_preset_rom;
 #else
@@ -61,7 +76,6 @@ enum app_tabs {
     tab_app_settings,
     tab_chip8_settings,
     tab_chip8_debug,
-    tab_about,
     tab_counts,
 };
 
@@ -76,22 +90,6 @@ static const char *tab_names[] = {
 
 static struct app global_app = { 0 };
 
-#ifdef PLATFORM_WEB
-EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
-    chip8_load_rom(&global_app.chip, buf, size);
-    return 1;
-}
-EM_JS(int, canvas_get_width, (), {
-  return canvas.width;
-});
-EM_JS(int, canvas_get_height, (), {
-  return canvas.height;
-});
-static const char *preset_roms[] = {
-    "roms/BRIX", "roms/octopaint.ch8", "roms/TETRIS"
-};
-#endif
-
 void app_init(struct app *app);
 void app_event(struct app *app);
 void app_draw(struct app *app);
@@ -99,10 +97,11 @@ void app_draw_touchscreen_keypad(struct app *app);
 void app_draw_tab_chip8_screen(struct app *app);
 void app_draw_tab_settings(struct app *app);
 void app_draw_tab_chip8_settings(struct app *app);
-void app_draw_tab_about(struct app *app);
 
 void app_init(struct app *app) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) exit(0);
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+        panic("Failed to init SDL");
+
     memset(app, 0, sizeof *app);
     chip8_init(&global_app.chip);
     app->win = SDL_CreateWindow("chip8 Emulator :D", 0, 0,
@@ -118,12 +117,15 @@ void app_init(struct app *app) {
     app->nk = nk_sdl_init(app->win, app->renderer);
     app->fg = (struct nk_colorf) {1.0f, 1.0f, 1.0f, 1.0f};
     app->bg = (struct nk_colorf) {0.0f, 0.0f, 0.0f, 1.0f};
-    struct nk_font_atlas *atlas;
-    nk_sdl_font_stash_begin(&atlas);
-    struct nk_font_config config = nk_font_config(0);
-    struct nk_font *font = nk_font_atlas_add_default(atlas, 24, &config);
-    nk_style_set_font(app->nk, &font->handle);
-    nk_sdl_font_stash_end();
+    {
+        struct nk_font_atlas *atlas;
+        struct nk_font_config config = nk_font_config(0);
+        nk_sdl_font_stash_begin(&atlas);
+        struct nk_font *font = nk_font_atlas_add_default(atlas, 24, &config);
+        nk_style_set_font(app->nk, &font->handle);
+        nk_sdl_font_stash_end();
+    }
+    beeper_init(&app->beeper);
 }
 
 void chip8_keydown(chip8 *chip, int key) {
@@ -161,7 +163,8 @@ void app_event(struct app *app)
                 break;
                             }
             case SDL_QUIT:
-                exit(0);
+                app->quit = true;
+                break;
             default:
                 break;
         }
@@ -255,15 +258,14 @@ void app_draw_tab_chip8_screen(struct app *app) {
     SDL_SetRenderDrawColor(app->renderer, app->fg.r * 255, app->fg.g * 255, app->fg.b * 255, 255);
     for (int y = 0; y < HEIGHT; y++) {
         for (int x = 0; x < WIDTH; x++) {
-            if (app->chip.screen[y][x]) {
-                const SDL_Rect bound = {
-                    .x = x * scalewidth,
-                    .y = y * scaleheight + gui_top_px,
-                    .w = scalewidth,
-                    .h = scaleheight
-                };
-                SDL_RenderFillRect(app->renderer, &bound);
-            }
+            if (!app->chip.screen[y][x]) continue;
+            const SDL_Rect bound = {
+                .x = x * scalewidth,
+                .y = y * scaleheight + gui_top_px,
+                .w = scalewidth,
+                .h = scaleheight
+            };
+            SDL_RenderFillRect(app->renderer, &bound);
         }
     }
 }
@@ -280,22 +282,8 @@ void app_draw_tab_chip8_settings(struct app *app) {
         nk_checkbox_label(app->nk, "fx55 fx65 increment I", &app->chip.settings.op_fx55_fx65_increment);
         nk_layout_row_dynamic(app->nk, 40, 1);
         nk_checkbox_label(app->nk, "8xy6 8xye to Vx = Vy", &app->chip.settings.op_8xy6_8xye_do_vy);
-        nk_end(app->nk);
     }
-}
-
-void app_draw_tab_about(struct app *app) {
-    static const char *about_text[] = {
-        "sheep8 - Chip8 emulator | debugger",
-        "sleepntsheep 2022",
-    };
-    if (nk_begin(app->nk, "About", nk_rect(0, gui_top_px, app->w, 300), 0)) {
-        for (size_t i = 0; i < LENGTH(about_text); i++) {
-            nk_layout_row_dynamic(app->nk, 40, 1);
-            nk_label(app->nk, about_text[i], NK_TEXT_LEFT);
-        }
-        nk_end(app->nk);
-    }
+    nk_end(app->nk);
 }
 
 void app_draw(struct app *app) {
@@ -310,9 +298,6 @@ void app_draw(struct app *app) {
     SDL_SetWindowSize(app->win, app->w, app->h);
 #endif
 
-    /*
-     * INTERMEDIATE GUI
-     * */
     if (nk_begin(app->nk, "Tabs", nk_rect(0, 0, app->w, gui_top_px), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(app->nk, gui_top_px, tab_counts);
         for (int i = 0; i < tab_counts; i++)
@@ -320,8 +305,9 @@ void app_draw(struct app *app) {
                 nk_button_label(app->nk, "");
             else if (nk_button_label(app->nk, tab_names[i]))
                 app->tab = i;
-        nk_end(app->nk);
     }
+    nk_end(app->nk);
+
     switch (app->tab) {
         case tab_chip8_screen:
             app_draw_tab_chip8_screen(app);
@@ -332,23 +318,20 @@ void app_draw(struct app *app) {
         case tab_chip8_settings:
             app_draw_tab_chip8_settings(app);
             break;
-        case tab_about:
-            app_draw_tab_about(app);
-            break;
     }
-    if (app->touchscreen_keypad) {
+
+    if (app->touchscreen_keypad)
         app_draw_touchscreen_keypad(app);
-    }
+
     nk_sdl_render(NK_ANTI_ALIASING_ON);
     SDL_RenderPresent(app->renderer);
 }
 
-void app_run(struct app *app)
-{
+void app_run(struct app *app) {
     app->tick_b = SDL_GetTicksCompat();
     if ((double)app->tick_b - app->tick_a < 1000.0f / 60)
         return;
-    app->tick_a = SDL_GetTicks64();
+    app->tick_a = SDL_GetTicksCompat();
 
     app_event(app);
     if (app->tab == tab_chip8_screen) {
@@ -357,28 +340,35 @@ void app_run(struct app *app)
     }
 
     if (app->chip.soundtimer > 0)
-        ;//AudioDriver_Play(&global_app.audio);
+        beeper_play(&app->beeper);
     else
-        ;//AudioDriver_Pause(&global_app.audio);
+        beeper_pause(&app->beeper);
 
     app_draw(app);
 }
 
-void app_main_loop()
-{
-    app_run(&global_app);
+void app_cleanup(struct app *app) {
+    beeper_clean(&app->beeper);
 }
 
-int main(__attribute__((unused)) int argc, __attribute__((unused)) char *argv[])
-{
+void app_main_loop() {
+    while (!global_app.quit)
+        app_run(&global_app);
+}
+
+
+int main(void) {
     app_init(&global_app);
 
 #ifdef PLATFORM_WEB
     emscripten_set_main_loop(app_main_loop, 0, 1);
 #else
-    while (true) app_main_loop();
+    while (!global_app.quit) app_main_loop();
 #endif
 
-    return EXIT_FAILURE;
+    app_cleanup(&global_app);
+
+    /* unreachable */
+    return EXIT_SUCCESS;
 }
 
