@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Build app",
+            "type": "command",
+            "program": "make",
+            "args": []
+        },
+        {
+            "name": "Run",
+            "type": "command",
+            "program": "make",
+            "args": ["run"]
+        },
+        {
+            "name": "Build for wasm",
+            "type": "command",
+            "program": "make",
+            "args": ["web"]
+        },
+    ]
+}
