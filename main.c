@@ -33,10 +33,6 @@
 #define LENGTH(a) (sizeof(a) / sizeof(*(a)))
 
 #ifdef PLATFORM_WEB
-EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
-    chip8_load_rom(&global_app.chip, buf, size);
-    return 1;
-}
 EM_JS(int, canvas_get_width, (), { return canvas.width; });
 EM_JS(int, canvas_get_height, (), { return canvas.height; });
 static const char *preset_roms[] = { "roms/BRIX", "roms/octopaint.ch8", "roms/TETRIS" };
@@ -88,7 +84,13 @@ static const char *tab_names[] = {
     NULL,
 };
 
+#ifdef PLATFORM_WEB
 static struct app global_app = { 0 };
+EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
+    chip8_load_rom(&global_app.chip, buf, size);
+    return 1;
+}
+#endif
 
 void app_init(struct app *app);
 void app_event(struct app *app);
@@ -97,19 +99,19 @@ void app_draw_touchscreen_keypad(struct app *app);
 void app_draw_tab_chip8_screen(struct app *app);
 void app_draw_tab_settings(struct app *app);
 void app_draw_tab_chip8_settings(struct app *app);
+void app_cleanup(struct app *app);
 
 void app_init(struct app *app) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
         panic("Failed to init SDL");
 
     memset(app, 0, sizeof *app);
-    chip8_init(&global_app.chip);
-    app->win = SDL_CreateWindow("chip8 Emulator :D", 0, 0,
-            800, 600, 
+    chip8_init(&app->chip);
+    app->win = SDL_CreateWindow("chip8 Emulator :D", 0, 0, 800, 600, SDL_WINDOW_SHOWN
 #ifndef PLATFORM_WEB
-            SDL_WINDOW_RESIZABLE |
+            | SDL_WINDOW_RESIZABLE
 #endif
-            SDL_WINDOW_SHOWN);
+            );
     app->renderer = SDL_CreateRenderer(app->win, -1, SDL_RENDERER_ACCELERATED);
     app->touchscreen_keypad = false;
     app->tab = tab_chip8_screen;
@@ -164,6 +166,10 @@ void app_event(struct app *app)
                             }
             case SDL_QUIT:
                 app->quit = true;
+#ifdef PLATFORM_WEB
+                app_cleanup(app);
+                exit(EXIT_SUCCESS);
+#endif
                 break;
             default:
                 break;
@@ -351,24 +357,24 @@ void app_cleanup(struct app *app) {
     beeper_clean(&app->beeper);
 }
 
-void app_main_loop() {
-    while (!global_app.quit)
-        app_run(&global_app);
-}
-
-
-int main(void) {
-    app_init(&global_app);
-
 #ifdef PLATFORM_WEB
-    emscripten_set_main_loop(app_main_loop, 0, 1);
-#else
-    while (!global_app.quit) app_main_loop();
+void app_main_loop() {
+    app_run(&global_app);
+}
 #endif
 
-    app_cleanup(&global_app);
+int main(void) {
 
-    /* unreachable */
+#ifdef PLATFORM_WEB
+    app_init(&global_app);
+    emscripten_set_main_loop(app_main_loop, 0, 1);
+#else
+    struct app app;
+    app_init(&app);
+    while (!app.quit) app_run(&app);
+    app_cleanup(&app);
+#endif
+
     return EXIT_SUCCESS;
 }
 
