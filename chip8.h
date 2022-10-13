@@ -54,16 +54,17 @@ static const uint8_t fonts[] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80
 };
 
-void chip8_load_rom(chip8 *chip, uint8_t *buf, size_t size);
-
-int chip8_load_rom_from_file(chip8 *chip, const char* path);
-
 void chip8_init(chip8 *chip);
-
+void chip8_load_rom(chip8 *chip, uint8_t *buf, size_t size);
+int chip8_load_rom_from_file(chip8 *chip, const char* path);
 void chip8_update_timer(chip8 *chip);
-
 void chip8_interpret(chip8 *chip);
-
 void chip8_wait_for_key(chip8 *chip, int reg);
+
+static const chip8_settings chip8_default_settings = {
+    .op_8xy6_8xye_do_vy = true,
+    .op_fx55_fx65_increment = false,
+    .op_8xy1_2_3_reset_vf = true,
+};
 
 #endif

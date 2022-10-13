@@ -12,12 +12,9 @@ void chip8_init(chip8 *chip)
     memset(chip, 0, sizeof *chip);
     memcpy(chip->memory, fonts, sizeof fonts);
     chip->pc = 0x200;
+    chip->i = 0;
     chip->clockspeed = DEFAULT_CLOCK;
-    chip->settings = (chip8_settings) {
-        .op_8xy1_2_3_reset_vf = true,
-        .op_8xy6_8xye_do_vy = true,
-        .op_fx55_fx65_increment = false,
-    };
+    chip->settings = chip8_default_settings;
 }
 
 void chip8_interpret(chip8 *chip)
@@ -169,8 +166,16 @@ void chip8_interpret(chip8 *chip)
                     uint8_t sprite = chip->memory[chip->i + row];
                     for (int col = 0; col < 8; col++) {
                         int bit = sprite >> (7 - col) & 1;
-                        uint8_t dx = (chip->v[x] + col) % WIDTH;
-                        uint8_t dy = (chip->v[y] + row) % HEIGHT;
+                        uint8_t dx = chip->v[x] + col;
+                        uint8_t dy = chip->v[y] + row;
+                        if (chip->settings.screen_wrap_around) {
+                            dx %= WIDTH;
+                            dy %= HEIGHT;
+                        } else {
+                            if (dx >= WIDTH || dy >= HEIGHT) {
+                                continue;
+                            }
+                        }
                         if (bit && chip->screen[dy][dx]) {
                             chip->v[0xF] = 1;
                         }
@@ -250,7 +255,7 @@ void chip8_load_rom(chip8 *chip, uint8_t *buf, size_t size)
     chip->pc = 0x200;
     chip->i = 0;
     memset(chip->screen, 0, sizeof chip->screen);
-    memcpy(chip->memory+0x200, buf, size);
+    memcpy(chip->memory + 0x200, buf, size);
 }
 
 int chip8_load_rom_from_file(chip8 *chip, const char *path)

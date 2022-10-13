@@ -288,6 +288,8 @@ void app_draw_tab_chip8_settings(struct app *app) {
         nk_checkbox_label(app->nk, "fx55 fx65 increment I", &app->chip.settings.op_fx55_fx65_increment);
         nk_layout_row_dynamic(app->nk, 40, 1);
         nk_checkbox_label(app->nk, "8xy6 8xye to Vx = Vy", &app->chip.settings.op_8xy6_8xye_do_vy);
+        nk_layout_row_dynamic(app->nk, 40, 1);
+        nk_checkbox_label(app->nk, "Wrap screen", &app->chip.settings.screen_wrap_around);
     }
     nk_end(app->nk);
 }
