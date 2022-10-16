@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define SDL_DISABLE_IMMINTRIN_H
+#define NK_BUTTON_TRIGGER_ON_RELEASE
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_BOOL
 #define NK_INCLUDE_STANDARD_IO
@@ -19,10 +21,12 @@
 #include <emscripten/emscripten.h>
 #endif
 
+#include "tinyfiledialogs.h"
 #define SHEEP_LOG_IMPLEMENTATION
 #include "log.h"
 #include "chip8.h"
 #include "beeper.h"
+#include "input.h"
 
 #ifdef SDL_GetTicks64
 #define SDL_GetTicksCompat SDL_GetTicks64
@@ -30,21 +34,11 @@
 #define SDL_GetTicksCompat SDL_GetTicks
 #endif
 
-#define LENGTH(a) (sizeof(a) / sizeof(*(a)))
-
 #ifdef PLATFORM_WEB
 EM_JS(int, canvas_get_width, (), { return canvas.width; });
 EM_JS(int, canvas_get_height, (), { return canvas.height; });
 static const char *preset_roms[] = { "roms/BRIX", "roms/octopaint.ch8", "roms/TETRIS" };
 #endif
-
-static const int kb2pad[] = {
-    [SDLK_1] = 1+1, [SDLK_2] = 2+1, [SDLK_3] = 3+1, [SDLK_4] = 0xC+1,
-    [SDLK_q] = 4+1, [SDLK_w] = 5+1, [SDLK_e] = 6+1, [SDLK_r] = 0xD+1,
-    [SDLK_a] = 7+1, [SDLK_s] = 8+1, [SDLK_d] = 9+1, [SDLK_f] = 0xE +1,
-    [SDLK_z] = 0xA+1, [SDLK_x] = 0x0+1, [SDLK_c] = 0xB+1, [SDLK_v] = 0xF+1,
-    /**** TO AVOID 0x0 COLLISION, EVERY VALUE HERE HAS BEEN OFFSET BY +1 */
-};
 
 static const int gui_top_px = 60;
 
@@ -55,15 +49,14 @@ struct app {
     chip8 chip;
     int tab;
     bool touchscreen_keypad;
+    bool debug_window;
     struct nk_colorf bg, fg;
     struct nk_context *nk;
     uint64_t tick_a, tick_b;
     int w, h;
-    struct beeper beeper;
+    beeper_t beeper;
 #ifdef PLATFORM_WEB
     int selected_preset_rom;
-#else
-    char rom_path[4096];
 #endif
 };
 
@@ -84,8 +77,8 @@ static const char *tab_names[] = {
     NULL,
 };
 
-#ifdef PLATFORM_WEB
 static struct app global_app = { 0 };
+#ifdef PLATFORM_WEB
 EMSCRIPTEN_KEEPALIVE int wasm_load_rom(uint8_t *buf, size_t size) {
     chip8_load_rom(&global_app.chip, buf, size);
     return 1;
@@ -99,7 +92,6 @@ void app_draw_touchscreen_keypad(struct app *app);
 void app_draw_tab_chip8_screen(struct app *app);
 void app_draw_tab_settings(struct app *app);
 void app_draw_tab_chip8_settings(struct app *app);
-void app_cleanup(struct app *app);
 
 void app_init(struct app *app) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
@@ -130,44 +122,18 @@ void app_init(struct app *app) {
     beeper_init(&app->beeper);
 }
 
-void chip8_keydown(chip8 *chip, int key) {
-    chip->keys |= 1 << key;
-}
 
-void chip8_keyup(chip8 *chip, int key) {
-    if (chip->key_waiting) {
-        chip->key_waiting = false;
-        chip->v[chip->register_waiting] = key;
-    }
-    chip->keys &= ~(1 << key);
-}
 
 void app_event(struct app *app)
 {
     SDL_Event e;
     nk_input_begin(app->nk);
     while (SDL_PollEvent(&e)) {
+        chip8_input_handle(&app->chip, e);
         switch (e.type) {
-            case SDL_KEYDOWN:
-            case SDL_KEYUP: {
-                if (app->touchscreen_keypad)
-                    break;
-                unsigned int sym = e.key.keysym.sym;
-                if (sym >= LENGTH(kb2pad))
-                    break;
-                int pad = kb2pad[e.key.keysym.sym] - 1;
-                if (pad == -1)
-                    break;
-                if (e.type == SDL_KEYDOWN)
-                    chip8_keydown(&app->chip, pad);
-                else
-                    chip8_keyup(&app->chip, pad);
-                break;
-                            }
             case SDL_QUIT:
                 app->quit = true;
 #ifdef PLATFORM_WEB
-                app_cleanup(app);
                 exit(EXIT_SUCCESS);
 #endif
                 break;
@@ -179,37 +145,20 @@ void app_event(struct app *app)
     nk_input_end(app->nk);
 }
 
-#define KEYBTN(s, p) \
-        do { \
-            int prev = app->chip.keys >> p & 1; \
-            int res = nk_button_label(app->nk, s); \
-            if (prev == res) break; \
-            if (res) chip8_keydown(&app->chip, p); \
-            else chip8_keyup(&app->chip, p); \
-        } while (0)
 void app_draw_touchscreen_keypad(struct app *app) {
     nk_button_set_behavior(app->nk, NK_BUTTON_REPEATER);
+    
     if (nk_begin(app->nk, "Keypad", nk_rect(app->w / 2.0f, gui_top_px, app->w / 2.0f, app->h - gui_top_px), 0)) {
-        nk_layout_row_dynamic(app->nk, app->h / 4.0f, 4);
-        KEYBTN("1", 1);
-        KEYBTN("2", 2);
-        KEYBTN("3", 3);
-        KEYBTN("4", 0xC);
-        nk_layout_row_dynamic(app->nk, app->h / 4.0f, 4);
-        KEYBTN("Q", 4);
-        KEYBTN("W", 5);
-        KEYBTN("E", 6);
-        KEYBTN("R", 0xD);
-        nk_layout_row_dynamic(app->nk, app->h / 4.0f, 4);
-        KEYBTN("A", 7);
-        KEYBTN("S", 8);
-        KEYBTN("D", 9);
-        KEYBTN("F", 0xE);
-        nk_layout_row_dynamic(app->nk, app->h / 4.0f, 4);
-        KEYBTN("Z", 0xA);
-        KEYBTN("X", 0);
-        KEYBTN("C", 0xB);
-        KEYBTN("V", 0xF);
+        for (int i = 0; i < sizeof keypad / sizeof *keypad; i+=4) {
+            nk_layout_row_dynamic(app->nk, (app->h - gui_top_px) / 4.0f, 4);
+            for (int j = 0; j < 4; j++) {
+                int prev = app->chip.keys >> keypad[i+j].i & 1;
+                int res = nk_button_label(app->nk, keypad[i+j].t);
+                if (prev == res) continue;
+                if (res) chip8_keydown(&app->chip, keypad[i+j].i);
+                else chip8_keyup(&app->chip, keypad[i+j].i);
+            }
+        }
         nk_end(app->nk);
     }
     nk_button_set_behavior(app->nk, NK_BUTTON_DEFAULT);
@@ -222,14 +171,22 @@ void app_draw_tab_settings(struct app *app) {
         app->bg = nk_color_picker(app->nk, app->bg, NK_RGBA);
 #ifndef PLATFORM_WEB
         nk_layout_row_dynamic(app->nk, 40, 2);
-        nk_edit_string_zero_terminated(
-            app->nk, 
-            NK_EDIT_BOX | NK_EDIT_AUTO_SELECT,
-            app->rom_path, sizeof app->rom_path, NULL
-        );
         if (nk_button_label(app->nk, "Load Rom")) {
-            chip8_load_rom_from_file(&app->chip, app->rom_path);
+            chip8_load_rom_from_file(&app->chip, 
+                    tinyfd_openFileDialog("Select rom file", "", 1, (const char *[]){ "*" },
+                        "binary file (chip8 rom)", false));
             app->tab = tab_chip8_screen;
+        }
+
+        nk_layout_row_dynamic(app->nk, 40, 2);
+        if (nk_button_label(app->nk, "Save state")) {
+            chip8_save_to_file(&app->chip, tinyfd_saveFileDialog(
+                    "Select where to save", "state", 1, (const char *[]){ "*" }, "binary file"));
+        }
+        if (nk_button_label(app->nk, "Load state")) {
+            chip8_restore_from_file(&app->chip, 
+                    tinyfd_openFileDialog("Select saved file", "", 1, (const char *[]){ "*" },
+                                          "binary file", false));
         }
 #else
         nk_layout_row_dynamic(app->nk, 40, 1);
@@ -243,15 +200,16 @@ void app_draw_tab_settings(struct app *app) {
             app->tab = tab_chip8_screen;
         }
         nk_layout_row_dynamic(app->nk, 40, 2);
-        nk_combobox(app->nk, preset_roms, LENGTH(preset_roms),
+        nk_combobox(app->nk, preset_roms, sizeof preset_roms / sizeof *preset_roms,
                 &app->selected_preset_rom, 20, (struct nk_vec2){150, 150});
         if (nk_button_label(app->nk, "Load selected preset")) {
             chip8_load_rom_from_file(&app->chip, preset_roms[app->selected_preset_rom]);
             app->tab = tab_chip8_screen;
         }
 #endif
-        nk_layout_row_dynamic(app->nk, 40, 1);
+        nk_layout_row_dynamic(app->nk, 40, 2);
         nk_checkbox_label(app->nk, "Touchscreen Keypad", &app->touchscreen_keypad);
+        nk_checkbox_label(app->nk, "Debug window", &app->debug_window);
     }
     nk_end(app->nk);
 }
@@ -260,18 +218,17 @@ void app_draw_tab_chip8_screen(struct app *app) {
     int scalewidth = app->w / WIDTH;
     int scaleheight = (app->h - gui_top_px) / HEIGHT;
     if (scaleheight < 0) scaleheight = 0;
-    if (app->touchscreen_keypad) scalewidth /= 2;
+    if (app->touchscreen_keypad || app->debug_window) scalewidth /= 2;
     SDL_SetRenderDrawColor(app->renderer, app->fg.r * 255, app->fg.g * 255, app->fg.b * 255, 255);
     for (int y = 0; y < HEIGHT; y++) {
         for (int x = 0; x < WIDTH; x++) {
             if (!app->chip.screen[y][x]) continue;
-            const SDL_Rect bound = {
+            SDL_RenderFillRect(app->renderer, &((SDL_Rect){
                 .x = x * scalewidth,
                 .y = y * scaleheight + gui_top_px,
                 .w = scalewidth,
                 .h = scaleheight
-            };
-            SDL_RenderFillRect(app->renderer, &bound);
+            }));
         }
     }
 }
@@ -290,6 +247,47 @@ void app_draw_tab_chip8_settings(struct app *app) {
         nk_checkbox_label(app->nk, "8xy6 8xye to Vx = Vy", &app->chip.settings.op_8xy6_8xye_do_vy);
         nk_layout_row_dynamic(app->nk, 40, 1);
         nk_checkbox_label(app->nk, "Wrap screen", &app->chip.settings.screen_wrap_around);
+    }
+    nk_end(app->nk);
+}
+
+/* maybe this could be seperate SDL window?? 
+ * or half-half layout like touchscreen keypad*/
+void app_draw_debug_window(struct app *app) {
+    char buf[2048] = { 0 };
+    if (nk_begin(app->nk, "Debugger", nk_rect(app->w / 2.0f, gui_top_px,
+                    app->w / 2.0f, app->h - gui_top_px), 0)) {
+    /*if (nk_begin(app->nk, "Debugger", nk_rect(0, gui_top_px, 400, 300),
+                NK_WINDOW_MOVABLE | NK_WINDOW_TITLE | NK_WINDOW_SCALABLE)) {
+                */
+        nk_layout_row_dynamic(app->nk, 200, 2);
+        
+        if (nk_group_begin(app->nk, "zefasofj", NK_WINDOW_BORDER)) {
+            for (int i = 0; i < 4; i++) {
+                nk_layout_row_dynamic(app->nk, 20, 1);
+                snprintf(buf, sizeof buf, "%d %d %d %d",
+                        chip8_keyisdown(&app->chip, keypad[i * 4].i),
+                        chip8_keyisdown(&app->chip, keypad[i * 4+1].i),
+                        chip8_keyisdown(&app->chip, keypad[i * 4+2].i),
+                        chip8_keyisdown(&app->chip, keypad[i * 4+3].i));
+                nk_label(app->nk, buf, NK_TEXT_LEFT);
+            }
+            nk_group_end(app->nk);
+        }
+
+        if (nk_group_begin(app->nk, "zefasofj2", NK_WINDOW_BORDER)) {
+            nk_layout_row_dynamic(app->nk, 20, 2);
+            snprintf(buf, sizeof buf, "ST: %d", app->chip.soundtimer);
+            nk_label(app->nk, buf, NK_TEXT_LEFT);
+            snprintf(buf, sizeof buf, "DT: %d", app->chip.delaytimer);
+            nk_label(app->nk, buf, NK_TEXT_LEFT);
+            nk_layout_row_dynamic(app->nk, 40, 2);
+            snprintf(buf, sizeof buf, "PC: %d", app->chip.pc);
+            nk_label(app->nk, buf, NK_TEXT_LEFT);
+            snprintf(buf, sizeof buf, "I: %d", app->chip.i);
+            nk_label(app->nk, buf, NK_TEXT_RIGHT);
+            nk_group_end(app->nk);
+        }
     }
     nk_end(app->nk);
 }
@@ -330,6 +328,8 @@ void app_draw(struct app *app) {
 
     if (app->touchscreen_keypad)
         app_draw_touchscreen_keypad(app);
+    if (app->debug_window)
+        app_draw_debug_window(app);
 
     nk_sdl_render(NK_ANTI_ALIASING_ON);
     SDL_RenderPresent(app->renderer);
@@ -355,10 +355,6 @@ void app_run(struct app *app) {
     app_draw(app);
 }
 
-void app_cleanup(struct app *app) {
-    beeper_clean(&app->beeper);
-}
-
 #ifdef PLATFORM_WEB
 void app_main_loop() {
     app_run(&global_app);
@@ -367,14 +363,12 @@ void app_main_loop() {
 
 int main(void) {
 
-#ifdef PLATFORM_WEB
     app_init(&global_app);
+#ifdef PLATFORM_WEB
     emscripten_set_main_loop(app_main_loop, 0, 1);
 #else
-    struct app app;
-    app_init(&app);
-    while (!app.quit) app_run(&app);
-    app_cleanup(&app);
+    while (!global_app.quit) app_run(&global_app);
+    beeper_clean(&global_app.beeper);
 #endif
 
     return EXIT_SUCCESS;

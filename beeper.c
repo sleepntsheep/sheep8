@@ -1,13 +1,13 @@
+#define SDL_DISABLE_IMMINTRIN_H
 #include "beeper.h"
 #include <stdlib.h>
 
 void beeper_callback(void *userdata, uint8_t *stream, int len)
 {
-    struct beeper *beeper = (struct beeper*)userdata;
+    beeper_t *beeper = (beeper_t*)userdata;
     short *snd = (short*)stream;
     len /= sizeof *snd;
-    for(int i = 0; i < len; i++)
-    {
+    for(int i = 0; i < len; i++) {
         snd[i] = 32000 * sin(beeper->time);
         beeper->time += beeper->freq * PI2 / 48000.0;
         if (beeper->time >= PI2)
@@ -16,7 +16,7 @@ void beeper_callback(void *userdata, uint8_t *stream, int len)
 }
 
 /* note - user must call SDL_Init(SDL_INIT_AUDIO) before calling this */
-void beeper_init(struct beeper *beeper) {
+void beeper_init(beeper_t *beeper) {
     memset(beeper, 0, sizeof *beeper);
     beeper->time = 0;
     beeper->freq = 441;
@@ -31,19 +31,20 @@ void beeper_init(struct beeper *beeper) {
     beeper->playing = false;
 }
 
-void beeper_play(struct beeper *beeper) {
+void beeper_play(beeper_t *beeper) {
     if (beeper->playing) return;
     beeper->playing = true;
     SDL_PauseAudioDevice(beeper->device, false);
 }
 
-void beeper_pause(struct beeper *beeper) {
+void beeper_pause(beeper_t *beeper) {
     if (!beeper->playing) return;
     beeper->playing = false;
     SDL_PauseAudioDevice(beeper->device, true);
 }
 
-void beeper_clean(struct beeper *beeper) {
+void beeper_clean(beeper_t *beeper) {
     SDL_CloseAudioDevice(beeper->device);
 }
+
 

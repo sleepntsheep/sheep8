@@ -1,5 +1,6 @@
 #include "chip8.h"
 #include <SDL2/SDL_events.h>
+#include "log.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -87,21 +88,18 @@ void chip8_interpret(chip8 *chip)
                         break;
                     case 0x1:
                         chip->v[x] |= chip->v[y];
-                        if (chip->settings.op_8xy1_2_3_reset_vf) {
+                        if (chip->settings.op_8xy1_2_3_reset_vf)
                             chip->v[0xF] = 0;
-                        }
                         break;
                     case 0x2:
                         chip->v[x] &= chip->v[y];
-                        if (chip->settings.op_8xy1_2_3_reset_vf) {
+                        if (chip->settings.op_8xy1_2_3_reset_vf)
                             chip->v[0xF] = 0;
-                        }
                         break;
                     case 0x3:
                         chip->v[x] ^= chip->v[y];
-                        if (chip->settings.op_8xy1_2_3_reset_vf) {
+                        if (chip->settings.op_8xy1_2_3_reset_vf)
                             chip->v[0xF] = 0;
-                        }
                         break;
                     case 0x4: {
                         /* Vx = Vx + Vy, VF = carry */
@@ -119,9 +117,8 @@ void chip8_interpret(chip8 *chip)
                               }
                     case 0x6: {
                         /* Vx = Vx SHR 1 */
-                        if (chip->settings.op_8xy6_8xye_do_vy) {
+                        if (chip->settings.op_8xy6_8xye_do_vy)
                             chip->v[x] = chip->v[y];
-                        }
                         int flag =  chip->v[x] & 1;
                         chip->v[x] >>= 1;
                         chip->v[0xF] = flag;
@@ -136,9 +133,8 @@ void chip8_interpret(chip8 *chip)
                               }
                     case 0xE: {
                         /* Vx = Vx SHL 1 */
-                        if (chip->settings.op_8xy6_8xye_do_vy) {
+                        if (chip->settings.op_8xy6_8xye_do_vy)
                             chip->v[x] = chip->v[y];
-                        }
                         int flag =  chip->v[x] >> 7;
                         chip->v[x] <<= 1;
                         chip->v[0xF] = flag;
@@ -147,9 +143,8 @@ void chip8_interpret(chip8 *chip)
                 }
                 break;
             case 0x9000:
-                if (chip->v[x] != chip->v[y]) {
+                if (chip->v[x] != chip->v[y])
                     chip->pc += 2;
-                }
                 break;
             case 0xA000:
                 chip->i = nnn;
@@ -171,14 +166,11 @@ void chip8_interpret(chip8 *chip)
                         if (chip->settings.screen_wrap_around) {
                             dx %= WIDTH;
                             dy %= HEIGHT;
-                        } else {
-                            if (dx >= WIDTH || dy >= HEIGHT) {
-                                continue;
-                            }
+                        } else if (dx >= WIDTH || dy >= HEIGHT) {
+                            continue;
                         }
-                        if (bit && chip->screen[dy][dx]) {
+                        if (bit && chip->screen[dy][dx])
                             chip->v[0xF] = 1;
-                        }
                         chip->screen[dy][dx] ^= bit;
                     }
                 }
@@ -187,15 +179,13 @@ void chip8_interpret(chip8 *chip)
                 switch (nn) {
                     case 0x9E:
                         /* SKP Vx */
-                        if (chip->keys & (1 << chip->v[x])) {
+                        if (chip->keys & (1 << chip->v[x]))
                             chip->pc += 2;
-                        }
                         break;
                     case 0xA1:
                         /* SKNP Vx */
-                        if (!(chip->keys & (1 << chip->v[x]))) {
+                        if (!(chip->keys & (1 << chip->v[x])))
                             chip->pc += 2;
-                        }
                         break;
                 }
                 break;
@@ -226,20 +216,16 @@ void chip8_interpret(chip8 *chip)
                         chip->memory[chip->i+2] = chip->v[x] % 10;
                         break;
                     case 0x55:
-                        for (int i = 0; i <= x; i++) {
+                        for (int i = 0; i <= x; i++)
                             chip->memory[chip->i+i] = chip->v[i];
-                        }
-                        if (chip->settings.op_fx55_fx65_increment) {
+                        if (chip->settings.op_fx55_fx65_increment)
                             chip->i += x + 1;
-                        }
                         break;
                     case 0x65:
-                        for (int i = 0; i <= x; i++) {
+                        for (int i = 0; i <= x; i++)
                             chip->v[i] = chip->memory[chip->i+i];
-                        }
-                        if (chip->settings.op_fx55_fx65_increment) {
+                        if (chip->settings.op_fx55_fx65_increment)
                             chip->i += x + 1;
-                        }
                         break;
                 }
                 break;
@@ -265,19 +251,19 @@ int chip8_load_rom_from_file(chip8 *chip, const char *path)
     chip->i = 0;
 	FILE *rom = fopen(path, "rb");
 	if (rom == NULL) {
-        fprintf(stderr, "Failed opening rom\n");
+        warn("Failed opening rom file");
         return -1;
     }
 	fseek(rom, 0, SEEK_END);
 	size_t rom_size = ftell(rom);
 	rewind(rom);
 	if ((MEMORY_SIZE - 0x200) < rom_size) {
-        fprintf(stderr, "Rom too big\n");
+        warn("Rom too big!");
         return -1;
     }
 	size_t result = fread(chip->memory+0x200, 1, rom_size, rom);
 	if (result != rom_size) {
-        fprintf(stderr, "Error reading rom\n");
+        warn("Error reading rom to memory");
         return -1;
     }
 	fclose(rom);
@@ -296,5 +282,41 @@ void chip8_wait_for_key(chip8 *chip, int reg) {
     if (chip->key_waiting) return;
     chip->key_waiting = true;
     chip->register_waiting = reg;
+}
+
+void chip8_save_to_file(chip8 *chip, const char *path) {
+    FILE *fp = fopen(path, "w");
+    if (fp == NULL) {
+        warn("Failed to open file for saving");
+        return;
+    }
+    fwrite(chip, sizeof *chip, 1, fp);
+    fclose(fp);
+}
+
+void chip8_restore_from_file(chip8 *chip, const char *path) {
+    FILE *fp = fopen(path, "rb");
+    if (fp == NULL) {
+        warn("Failed to open file for restoring");
+        return;
+    }
+    fread(chip, sizeof *chip, 1, fp);
+    fclose(fp);
+}
+
+bool chip8_keyisdown(chip8 *chip, int key) {
+    return chip->keys & (1 << key);
+}
+
+void chip8_keydown(chip8 *chip, int key) {
+    chip->keys |= 1 << key;
+}
+
+void chip8_keyup(chip8 *chip, int key) {
+    if (chip->key_waiting) {
+        chip->key_waiting = false;
+        chip->v[chip->register_waiting] = key;
+    }
+    chip->keys &= ~(1 << key);
 }
 

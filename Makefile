@@ -1,7 +1,7 @@
-CC ?= gcc
-CFLAGS := -std=c99 -g -pedantic -Wall -Wextra -Ofast
+CC = tcc
+CFLAGS := -std=c99 -pedantic -Wall -Wextra -Ofast
 LIBS := -lSDL2 -lm
-SRCS := main.c chip8.c beeper.c
+SRCS := main.c chip8.c beeper.c tinyfiledialogs.c input.c
 
 all: sheep8
 

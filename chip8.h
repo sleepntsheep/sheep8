@@ -60,6 +60,11 @@ int chip8_load_rom_from_file(chip8 *chip, const char* path);
 void chip8_update_timer(chip8 *chip);
 void chip8_interpret(chip8 *chip);
 void chip8_wait_for_key(chip8 *chip, int reg);
+void chip8_save_to_file(chip8 *chip, const char *path);
+void chip8_restore_from_file(chip8 *chip, const char *path);
+void chip8_keydown(chip8 *chip, int key);
+void chip8_keyup(chip8 *chip, int key);
+bool chip8_keyisdown(chip8 *chip, int key);
 
 static const chip8_settings chip8_default_settings = {
     .op_8xy6_8xye_do_vy = true,
@@ -67,4 +72,5 @@ static const chip8_settings chip8_default_settings = {
     .op_8xy1_2_3_reset_vf = true,
 };
 
-#endif
+#endif /* CHIP8_H */
+

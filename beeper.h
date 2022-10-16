@@ -12,6 +12,8 @@
 
 #define PI2 6.28318530718
 
+typedef struct beeper beeper_t;
+
 struct beeper {
     SDL_AudioDeviceID device;
     SDL_AudioSpec spec;
@@ -20,10 +22,10 @@ struct beeper {
     float freq;
 };
 
-void beeper_init(struct beeper *beeper);
-void beeper_play(struct beeper *beeper);
-void beeper_pause(struct beeper *beeper);
+void beeper_init(beeper_t *beeper);
+void beeper_play(beeper_t *beeper);
+void beeper_pause(beeper_t *beeper);
 void beeper_callback(void *userdata, uint8_t *stream, int len);
-void beeper_clean(struct beeper *beeper);
+void beeper_clean(beeper_t *beeper);
 
 #endif /* CHIP8_AUDIO_H */
